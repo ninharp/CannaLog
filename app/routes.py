@@ -77,11 +77,8 @@ def edit_plant_action_log(log_id):
         log.date = form.date.data
         log.action = form.action.data
         log.notes = form.notes.data
-        images = PlantImage.query.filter_by(plant_id=plant.id).order_by(PlantImage.id).all()
-        form.preview_image_id.choices = [(-1, 'Kein Vorschaubild')] + [
-            (img.id, f"Bild {idx+1}") for idx, img in enumerate(images)
-        ]
-        return redirect(url_for('plant_action_logs'))
+        db.session.commit()
+        return redirect(url_for('plant_overview', plant_id=log.plant_id))
     return render_template('plant_action_log_form.html', form=form, edit=True, log=log)
 
 @app.route('/plant_actions/<int:log_id>/delete', methods=['POST'])
