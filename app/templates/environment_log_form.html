@@ -4,7 +4,7 @@
 <div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
     <div class="d-flex align-items-center mb-4" style="gap:1rem;">
         <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" class="logo-small" style="height:60px; width:auto; display:block;">
-        <h1 class="mb-0 fw-bold" style="font-size:2.2rem; line-height:60px;">Log-Eintrag {{ env.name }}</h1>
+        <h1 class="mb-0 fw-bold" style="font-size:1.8rem; line-height:60px;">Log-Eintrag {{ env.name }}</h1>
     </div>
     <form method="POST">
     {{ form.hidden_tag() }}
