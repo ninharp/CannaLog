@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block title %}Log-Eintrag{% endblock %}
+{% block content %}
+<div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
+    <div class="d-flex align-items-center mb-4" style="gap:1rem;">
+        <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" class="logo-small" style="height:60px; width:auto; display:block;">
+        <h1 class="mb-0 fw-bold" style="font-size:2.2rem; line-height:60px;">Log-Eintrag {{ env.name }}</h1>
+    </div>
+    <form method="POST">
+    {{ form.hidden_tag() }}
+    {% if form.errors %}
+    <div class="alert alert-danger">
+        <b>Fehler beim Speichern:</b>
+        <ul>
+        {% for field, errors in form.errors.items() %}
+            <li><b>{{ form[field].label.text if field in form else field }}:</b> {{ errors|join(', ') }}</li>
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    {% if global_mode %}
+    <div class="mb-3">
+        {{ form.env_id.label(class="form-label") }}
+        {{ form.env_id(class="form-select") }}
+        {% for error in form.env_id.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+    </div>
+    {% endif %}
+    <div class="mb-3">
+        {{ form.date.label(class="form-label") }}
+        {{ form.date(class="form-control") }}
+        {% for error in form.date.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="mb-3">
+        {{ form.notes.label(class="form-label") }}
+        {{ form.notes(class="form-control", rows=4) }}
+        {% for error in form.notes.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+    </div>
+    <h5 class="mt-4">Messungen (optional)</h5>
+    <div id="measurements-list">
+        {% for mform in form.measurements %}
+        <div class="row mb-2 align-items-end measurement-row">
+            <div class="col-md-3">
+                {{ mform.form.type.label(class="form-label") }}
+                {{ mform.form.type(class="form-select") }}
+                {% for error in mform.form.type.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-2">
+                {{ mform.form.value.label(class="form-label") }}
+                {{ mform.form.value(class="form-control", placeholder="Wert", oninput="disableMinMax(this)") }}
+                {% for error in mform.form.value.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-2">
+                {{ mform.form.min_value.label(class="form-label") }}
+                {{ mform.form.min_value(class="form-control", placeholder="Min", oninput="disableValue(this)") }}
+                {% for error in mform.form.min_value.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-2">
+                {{ mform.form.max_value.label(class="form-label") }}
+                {{ mform.form.max_value(class="form-control", placeholder="Max", oninput="disableValue(this)") }}
+                {% for error in mform.form.max_value.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeMeasurementRow(this)">Entfernen</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <button type="button" class="btn btn-outline-info btn-sm mb-3" onclick="addMeasurementRow()">+ Weitere Messung</button>
+    <hr class="my-4">
+    <script>
+    function reindexMeasurementRows() {
+        const rows = document.querySelectorAll('#measurements-list .measurement-row');
+        rows.forEach((row, idx) => {
+            row.querySelectorAll('input,select,label').forEach(el => {
+                if (el.name) el.name = el.name.replace(/measurements-\d+-/, `measurements-${idx}-`);
+                if (el.id) el.id = el.id.replace(/measurements-\d+-/, `measurements-${idx}-`);
+                if (el.htmlFor) el.htmlFor = el.htmlFor.replace(/measurements-\d+-/, `measurements-${idx}-`);
+            });
+        });
+    }
+    function addMeasurementRow() {
+        const list = document.getElementById('measurements-list');
+        const rows = list.getElementsByClassName('measurement-row');
+        if (rows.length === 0) return;
+        const last = rows[rows.length-1];
+        const clone = last.cloneNode(true);
+        // Leere alle Felder im Clone
+        Array.from(clone.querySelectorAll('input,select')).forEach(el => el.value = '');
+        list.appendChild(clone);
+        reindexMeasurementRows();
+    }
+    function removeMeasurementRow(btn) {
+        const row = btn.closest('.measurement-row');
+        const list = document.getElementById('measurements-list');
+        if (list.getElementsByClassName('measurement-row').length > 1) {
+            row.remove();
+            reindexMeasurementRows();
+        } else {
+            // Nur leeren, nicht entfernen
+            Array.from(row.querySelectorAll('input,select')).forEach(el => el.value = '');
+        }
+    }
+    function disableMinMax(input) {
+        const row = input.closest('.measurement-row');
+        if (input.value) {
+            row.querySelector('input[name$="min_value"]').disabled = true;
+            row.querySelector('input[name$="max_value"]').disabled = true;
+        } else {
+            row.querySelector('input[name$="min_value"]').disabled = false;
+            row.querySelector('input[name$="max_value"]').disabled = false;
+        }
+    }
+    function disableValue(input) {
+        const row = input.closest('.measurement-row');
+        if (input.value) {
+            row.querySelector('input[name$="value"]').disabled = true;
+        } else {
+            row.querySelector('input[name$="min_value"]').disabled = false;
+            row.querySelector('input[name$="max_value"]').disabled = false;
+            row.querySelector('input[name$="value"]').disabled = false;
+        }
+    }
+    </script>
+    <div class="d-flex justify-content-between align-items-center mt-4">
+        <div>
+            {% if global_mode %}
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Zurück</a>
+            {% else %}
+                <a href="{{ url_for('environment_overview', env_id=env.id) }}" class="btn btn-secondary">Zurück</a>
+            {% endif %}
+        </div>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success">Speichern</button>
+        </div>
+    </div>
+</form>
+{% if edit %}
+<div class="d-flex justify-content-end mt-2">
+    <form method="POST" action="{{ url_for('delete_environment_log', log_id=log.id) }}" onsubmit="return confirm('Log-Eintrag wirklich löschen?');" style="display:inline;">
+        <button type="submit" class="btn btn-danger">Löschen</button>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

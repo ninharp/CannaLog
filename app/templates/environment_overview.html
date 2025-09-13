@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% block title %}Umgebung: {{ env.name }} - Cannalog{% endblock %}
+{% block content %}
+
+<div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
+    <div class="d-flex align-items-center mb-4" style="gap:1rem;">
+        <a href="{{ url_for('dashboard') }}">
+        <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" class="logo-small" style="height:60px; width:auto; display:block; cursor:pointer;">
+        </a>
+        <h1 class="mb-0 fw-bold" style="font-size:2.5rem; line-height:60px;">{{ env.name }}</h1>
+    </div>
+
+
+{% set preview_img = None %}
+{% if env.preview_image_id %}
+    {% for img in env.images %}
+        {% if img.id == env.preview_image_id %}{% set preview_img = img %}{% endif %}
+    {% endfor %}
+{% endif %}
+{% if not preview_img and env.images and env.images|length > 0 %}
+    {% set preview_img = env.images[0] %}
+{% endif %}
+{% if preview_img %}
+    <div class="mb-3">
+        <img src="{{ url_for('uploaded_file', filename=preview_img.filename) }}" alt="Vorschaubild" width="180" style="border-radius:8px;">
+    </div>
+{% endif %}
+
+
+<div class="mb-4">
+    <div class="d-flex flex-wrap gap-3">
+        <span class="badge bg-light text-dark border"><strong>Größe:</strong> {{ env.length }} x {{ env.width }} x {{ env.height }} cm</span>
+        <span class="badge bg-light text-dark border"><strong>Belichtungszeit:</strong> {{ env.exposure_time }} h</span>
+        <span class="badge bg-light text-dark border"><strong>Autom. Bewässerung:</strong> {% if env.auto_watering %}<span style="color:green;">&#10003;</span>{% else %}<span style="color:red;">&#10007;</span>{% endif %}</span>
+        <span class="badge bg-light text-dark border"><strong>Lichtsteuerung:</strong> {% if env.light_enabled %}<span style="color:green;">&#10003;</span>{% else %}<span style="color:red;">&#10007;</span>{% endif %}</span>
+    </div>
+</div>
+{% if env.notes %}
+<div class="mb-4">
+    <div style="background:#f3f3f3; color:#444; border-radius:5px; padding:0.5em 1em; max-width:600px; text-align:left; font-size:0.98em; border:1px solid #e0e0e0;">
+        <span style="font-weight:600; color:#888;">Notizen:</span><br>
+        <span style="display:block; margin-top:0.3em;">{{ env.notes }}</span>
+    </div>
+</div>
+{% endif %}
+
+<h4>Pflanzen in dieser Umgebung</h4>
+<ul class="list-group mb-4">
+    {% for plant in plants %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <a href="{{ url_for('plant_overview', plant_id=plant.id) }}" style="text-decoration:none; color:inherit;">
+                <strong>{{ plant.pflanzenname }}</strong>
+            </a>
+            <span class="badge bg-light text-dark border ms-2">Anzahl: {{ plant.count }}</span>
+            {% if plant.environment %}
+                <span class="text-muted ms-2">({{ plant.environment.name }})</span>
+            {% endif %}
+            {% if plant.images and plant.images|length > 0 %}
+                <img src="{{ url_for('uploaded_file', filename=plant.images[0].filename) }}" alt="Bild" width="50" class="ms-2" style="border-radius:6px;">
+            {% endif %}
+        </div>
+        <div>
+            <a href="{{ url_for('edit_plant', plant_id=plant.id) }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
+            <form method="POST" action="{{ url_for('delete_plant', plant_id=plant.id) }}" style="display:inline;" onsubmit="return confirm('Pflanze wirklich löschen? Alle zugehörigen Bilder werden entfernt!');">
+                <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
+            </form>
+        </div>
+    </li>
+    {% else %}
+    <li class="list-group-item">Keine Pflanzen in dieser Umgebung. Mit <span class="btn btn-outline-success btn-sm px-2 py-0" style="font-size:1.2rem; pointer-events:none;">+</span> kannst du eine neue Pflanze hinzufügen.</li>
+    {% endfor %}
+</ul>
+<div class="d-flex align-items-center gap-2 mb-4 justify-content-between">
+    <div>
+        <a href="{{ url_for('add_plant', env_id=env.id) }}" class="btn btn-outline-success btn-sm" title="Pflanze hinzufügen" style="font-size:1.2rem; padding:0.2em 0.7em;">+</a>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('edit_environment', env_id=env.id) }}" class="btn btn-outline-primary btn-sm" title="Umgebung bearbeiten">Bearbeiten</a>
+        <form method="POST" action="{{ url_for('delete_environment', env_id=env.id) }}" style="display:inline;" id="delete-env-form">
+            <button type="submit" class="btn btn-danger btn-sm" title="Umgebung löschen">Löschen</button>
+        </form>
+    </div>
+</div>
+<!-- ...Logbuch und restlicher Inhalt... -->
+
+
+<h4 class="mt-5 mb-3">Logbuch</h4>
+<div class="mb-3">
+    <a href="{{ url_for('add_environment_log', env_id=env.id) }}" class="btn btn-success btn-sm">+ Neuer Log-Eintrag</a>
+</div>
+<div class="table-responsive">
+{% if entries %}
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th>Datum</th>
+            <th>Notizen</th>
+            <th>Messungen</th>
+            <th>Aktionen</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for log in entries %}
+        <tr>
+            <td>{{ log.date.strftime('%d.%m.%Y') }}</td>
+            <td>{{ log.notes|default('-') }}</td>
+            <td>
+                {% if log.measurements|length > 0 %}
+                    <span class="badge bg-info text-dark">{{ log.measurements|length }}</span>
+                    {% set type_icons = {
+                        'luftfeuchtigkeit': '%',
+                        'umgebungstemperatur': '🌡️',
+                        'aussentemperatur': '🌡️',
+                        'lichtabstand': '↕️',
+                        'co2': 'CO₂',
+                        'niederschlaege': '🌧️',
+                        'durchschnittliche_ppfd': '☀️',
+                        'vpd': '💨'
+                    } %}
+                    {% for m in log.measurements %}
+                        <span title="{{ m.type }}">{{ type_icons.get(m.type, '🔬') }}</span>
+                    {% endfor %}
+                {% else %}
+                    <span class="text-muted">-</span>
+                {% endif %}
+            </td>
+            <td>
+                <a href="{{ url_for('edit_environment_log', log_id=log.id) }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
+                <form method="POST" action="{{ url_for('delete_environment_log', log_id=log.id) }}" style="display:inline;" onsubmit="return confirm('Log-Eintrag wirklich löschen?');">
+                    <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
+                </form>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Keine Log-Einträge vorhanden.</p>
+{% endif %}
+<div class="mt-5">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Zurück</a>
+</div>
+<script>
+    document.getElementById('delete-env-form').onsubmit = function(e) {
+        e.preventDefault();
+        const first = confirm('Umgebung wirklich löschen?\n\nAlle zugehörigen Bilder werden entfernt!');
+        if (!first) return; // Abbrechen
+        const second = confirm('Sollen auch alle Pflanzen dieser Umgebung gelöscht werden?\n\nKlicke OK um ALLE Pflanzen zu löschen, Abbrechen um Pflanzen auf Aussenbereich zu verschieben.');
+        if (second) {
+            this.submit();
+        } else {
+            fetch("{{ url_for('delete_environment', env_id=env.id) }}?move_plants=1", {method: 'POST'})
+                .then(() => window.location.href = "{{ url_for('dashboard') }}");
+        }
+    };
+</script>
+{% endblock %}

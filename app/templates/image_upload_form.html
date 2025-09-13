@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Bilder hochladen{% endblock %}
+{% block content %}
+<div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
+    <div class="d-flex align-items-center mb-4" style="gap:1rem;">
+        <a href="{{ url_for('dashboard') }}">
+            <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" style="height:60px; width:auto; display:block; cursor:pointer;">
+        </a>
+        <h1 class="mb-0 fw-bold" style="font-size:2.2rem; line-height:60px;">Bilder hochladen</h1>
+    </div>
+    <form method="POST" enctype="multipart/form-data">
+    {{ form.hidden_tag() }}
+    {% if form.errors %}
+    <div class="alert alert-danger">
+        <b>Fehler beim Hochladen:</b>
+        <ul>
+        {% for field, errors in form.errors.items() %}
+            <li><b>{{ form[field].label.text if field in form else field }}:</b> {{ errors|join(', ') }}</li>
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    <div class="mb-3">
+        {{ form.target.label(class="form-label") }}
+        {{ form.target(class="form-select") }}
+        {% for error in form.target.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="mb-3">
+        {{ form.images.label(class="form-label") }}
+        {{ form.images(class="form-control", multiple=true) }}
+        <div class="form-text">Du kannst mehrere Bilder gleichzeitig auswählen.</div>
+        {% for error in form.images.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="d-flex justify-content-between align-items-center mt-4">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Zurück</a>
+        <button type="submit" class="btn btn-success">Hochladen</button>
+    </div>
+</form>
+</form>
+{% endblock %}

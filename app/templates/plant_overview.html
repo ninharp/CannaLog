@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}Pflanze: {{ plant.pflanzenname }} - Cannalog{% endblock %}
+{% block content %}
+
+<div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
+    <div class="d-flex align-items-center mb-4" style="gap:1rem;">
+        <a href="{{ url_for('dashboard') }}">
+            <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" style="height:60px; width:auto; display:block; cursor:pointer;">
+        </a>
+        <h1 class="mb-0 fw-bold" style="font-size:2.5rem; line-height:60px;">{{ plant.pflanzenname }}</h1>
+    </div>
+
+{% set preview_img = None %}
+{% if plant.preview_image_id %}
+    {% for img in plant.images %}
+        {% if img.id == plant.preview_image_id %}{% set preview_img = img %}{% endif %}
+    {% endfor %}
+{% endif %}
+{% if not preview_img and plant.images and plant.images|length > 0 %}
+    {% set preview_img = plant.images[0] %}
+{% endif %}
+{% if preview_img %}
+    <div class="mb-3">
+        <img src="{{ url_for('uploaded_file', filename=preview_img.filename) }}" alt="Vorschaubild" width="180" style="border-radius:8px;">
+    </div>
+{% endif %}
+
+<div class="mb-4">
+    <div class="d-flex flex-wrap gap-3">
+        <span class="badge bg-light text-dark border"><strong>Anzahl:</strong> {{ plant.count }}</span>
+        <span class="badge bg-light text-dark border"><strong>Medium:</strong> {{ plant.medium_type }}</span>
+        <span class="badge bg-light text-dark border"><strong>Phase:</strong> {{ plant.phase }}</span>
+        <span class="badge bg-light text-dark border"><strong>Strain:</strong> {{ plant.strain }}</span>
+        <span class="badge bg-light text-dark border"><strong>Datum:</strong> {{ plant.date.strftime('%d.%m.%Y') if plant.date else '-' }}</span>
+    <span class="badge bg-light text-dark border"><strong>Umgebung:</strong> {{ plant.environment.name if plant.environment else 'Aussenbereich' }}</span>
+    </div>
+</div>
+{% if plant.notes %}
+<div class="mb-4">
+    <div style="background:#f3f3f3; color:#444; border-radius:5px; padding:0.5em 1em; max-width:600px; text-align:left; font-size:0.98em; border:1px solid #e0e0e0;">
+        <span style="font-weight:600; color:#888;">Notizen:</span><br>
+        <span style="display:block; margin-top:0.3em;">{{ plant.notes }}</span>
+    </div>
+</div>
+{% endif %}
+<div class="d-flex align-items-center gap-2 mb-4 justify-content-between">
+    <div>
+    <a href="{{ url_for('edit_plant', plant_id=plant.id) }}" class="btn btn-outline-primary btn-sm" title="Bearbeiten">Bearbeiten</a>
+    </div>
+    <form method="POST" action="{{ url_for('delete_plant', plant_id=plant.id) }}" style="display:inline;" onsubmit="return confirm('Pflanze wirklich löschen? Alle zugehörigen Bilder werden entfernt!');">
+    <button type="submit" class="btn btn-outline-danger btn-sm" title="Löschen">Löschen</button>
+    </form>
+</div>
+<!-- ...Logbuch und restlicher Inhalt... -->
+
+
+<h4 class="mt-5 mb-3">Logbuch</h4>
+<div class="mb-3 d-flex gap-2">
+    <a href="{{ url_for('add_plant_log', plant_id=plant.id) }}" class="btn btn-success btn-sm">+ Neuer Log-Eintrag</a>
+    <a href="{{ url_for('add_plant_action_log') }}?plant_id={{ plant.id }}" class="btn btn-info btn-sm">+ Neue Aktion</a>
+</div>
+<div class="table-responsive">
+{% if entries %}
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th>Datum</th>
+            <th>Notizen</th>
+            <th>Messungen / Aktion</th>
+            <th>Aktionen</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for entry in entries %}
+        <tr>
+            <td>{{ entry.date.strftime('%d.%m.%Y') }}</td>
+            <td>
+                {% if entry.type == 'log' %}
+                    {{ entry.obj.notes|default('-') }}
+                {% elif entry.type == 'action' %}
+                    {{ entry.obj.notes|default('-') }}
+                {% endif %}
+            </td>
+            <td>
+                {% if entry.type == 'log' %}
+                    {% if entry.obj.measurements|length > 0 %}
+                        <span class="badge bg-info text-dark">{{ entry.obj.measurements|length }}</span>
+                        {% set type_icons = {
+                            'hoehe': '↕️',
+                            'tds': 'TDS',
+                            'ph': 'pH',
+                            'ec': '⚡',
+                            'wassertemperatur': '🌡️',
+                            'ppfd': '☀️'
+                        } %}
+                        {% for m in entry.obj.measurements %}
+                            <span title="{{ m.type }}">{{ type_icons.get(m.type, '🔬') }}</span>
+                        {% endfor %}
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                {% elif entry.type == 'action' %}
+                    <span class="badge bg-warning text-dark">A</span> {{ entry.obj.action|capitalize }}
+                {% endif %}
+            </td>
+            <td>
+                {% if entry.type == 'log' %}
+                    <a href="{{ url_for('edit_plant_log', log_id=entry.obj.id) }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
+                    <form method="POST" action="{{ url_for('delete_plant_log', log_id=entry.obj.id) }}" style="display:inline;" onsubmit="return confirm('Log-Eintrag wirklich löschen?');">
+                        <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
+                    </form>
+                {% elif entry.type == 'action' %}
+                    <a href="{{ url_for('edit_plant_action_log', log_id=entry.obj.id) }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
+                    <form method="POST" action="{{ url_for('delete_plant_action_log', log_id=entry.obj.id) }}" style="display:inline;" onsubmit="return confirm('Aktion wirklich löschen?');">
+                        <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
+                    </form>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Keine Log-Einträge vorhanden.</p>
+{% endif %}
+
+<div class="mt-5">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Zurück</a>
+</div>
+{% endblock %}

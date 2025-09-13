@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% block title %}Umgebung speichern - Cannalog{% endblock %}
+{% block content %}
+<div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
+    <div class="d-flex align-items-center mb-3" style="gap:1rem;">
+        <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" style="height:38px; width:auto; display:block;">
+        <h2 class="mb-0">{% if env %}Umgebung bearbeiten{% else %}Umgebung hinzufügen{% endif %}</h2>
+    </div>
+    <form method="POST" enctype="multipart/form-data">
+    {{ form.hidden_tag() }}
+    {% if form.errors %}
+    <div class="alert alert-danger">
+        <ul class="mb-0">
+        {% for field, errors in form.errors.items() %}
+            {% for error in errors %}
+                <li><strong>{{ form[field].label.text if field in form else field }}:</strong> {{ error }}</li>
+            {% endfor %}
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    <div class="mb-3">{{ form.name.label }} {{ form.name(class_="form-control") }}</div>
+    <div class="mb-3">{{ form.auto_watering() }} {{ form.auto_watering.label }}</div>
+    <div class="mb-3">{{ form.light_enabled() }} {{ form.light_enabled.label }}</div>
+    <div class="mb-3">
+        {{ form.exposure_time.label }}
+        <input type="range" name="exposure_time" min="0" max="24" step="1" value="{{ form.exposure_time.data or 18 }}" class="form-range" id="exposure_time_slider" oninput="document.getElementById('exposure_time_output').value = this.value" style="width:100%;">
+        <div class="d-flex justify-content-between" style="font-size:0.95em; color:#888; margin-top:-8px;">
+            <span>0</span>
+            <span>6</span>
+            <span>12</span>
+            <span>18</span>
+            <span>24</span>
+        </div>
+        <output id="exposure_time_output" style="margin-left:10px; font-weight:600; color:#333;">{{ form.exposure_time.data or 18 }}</output> Stunden Licht
+    </div>
+    <div class="mb-3">{{ form.notes.label }} {{ form.notes(class_="form-control") }}</div>
+    <div class="mb-3">
+        {{ form.images.label }}
+        <div id="image-fields">
+            <div class="input-group mb-1">
+                <input type="file" name="images" class="form-control" accept="image/*">
+                <button type="button" class="btn btn-outline-danger" onclick="removeImageField(this)">Entfernen</button>
+            </div>
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="addImageField()">Weiteres Bild hinzufügen</button>
+    </div>
+    <input type="hidden" id="preview_image_id" name="preview_image_id" value="{{ env.preview_image_id if env is defined and env.preview_image_id else -1 }}">
+    {% if env and env.images %}
+    <div class="mt-2 mb-3">
+        <strong>Vorhandene Bilder (Klick für Vorschaubild):</strong><br>
+        <div id="env-image-list">
+        {% for img in env.images %}
+            <div class="d-inline-block text-center me-2 mb-2">
+                <div style="position:relative;">
+                    {% set img_style = 'border-radius:6px; display:block; cursor:pointer;' + (' border:3px solid #198754;' if env.preview_image_id == img.id else ' border:1px solid #ccc;') %}
+                    <img src="/uploads/{{ img.filename }}" alt="Bild" width="80" style="{{ img_style }}" onclick="selectPreviewImage({{ img.id }}, this)">
+                    {% if env.preview_image_id == img.id %}
+                        <span class="preview-star" style="position:absolute;top:2px;right:2px;background:#198754;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:1.1em;z-index:2;" title="Vorschaubild">★</span>
+                    {% endif %}
+                </div>
+                <div style="font-size:0.9em; color:#888;">Bild {{ loop.index }}</div>
+                <button type="button" class="btn btn-outline-danger btn-sm mt-1" onclick="deleteEnvImage('{{ img.id }}')">Entfernen</button>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+    <script>
+    function selectPreviewImage(imgId, el) {
+        document.getElementById('preview_image_id').value = imgId;
+        // Rahmen und Stern aktualisieren
+        document.querySelectorAll('#env-image-list img').forEach(img => {
+            img.style.border = '';
+        });
+        el.style.border = '3px solid #198754';
+        document.querySelectorAll('#env-image-list .preview-star').forEach(star => star.remove());
+        // Stern hinzufügen
+        const star = document.createElement('span');
+        star.className = 'preview-star';
+        star.style = 'position:absolute;top:2px;right:2px;background:#198754;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:1.1em;z-index:2;';
+        star.title = 'Vorschaubild';
+        star.innerText = '★';
+        el.parentElement.appendChild(star);
+    }
+    </script>
+    {% endif %}
+    <input type="hidden" id="delete_image_id" name="delete_image_id" value="">
+    <script>
+    function addImageField() {
+        const container = document.getElementById('image-fields');
+        const group = document.createElement('div');
+        group.className = 'input-group mb-1';
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.name = 'images';
+        input.className = 'form-control';
+        input.accept = 'image/*';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-outline-danger';
+        btn.textContent = 'Entfernen';
+        btn.onclick = function() { removeImageField(btn); };
+        group.appendChild(input);
+        group.appendChild(btn);
+        container.appendChild(group);
+    }
+    function removeImageField(btn) {
+        btn.parentElement.remove();
+    }
+    </script>
+
+
+    <div class="mb-3 row">
+        <div class="col">{{ form.length.label }} {{ form.length(class_="form-control") }}</div>
+        <div class="col">{{ form.width.label }} {{ form.width(class_="form-control") }}</div>
+        <div class="col">{{ form.height.label }} {{ form.height(class_="form-control") }}</div>
+    </div>
+
+    <h5>Lampen</h5>
+    <div id="lamps">
+        {% for lamp_form in form.lamps %}
+        <div class="row mb-2">
+            <div class="col">{{ lamp_form.form.type.label }} {{ lamp_form.form.type(class_="form-select") }}</div>
+            <div class="col">{{ lamp_form.form.power.label }} {{ lamp_form.form.power(class_="form-control") }}</div>
+            <div class="col">{{ lamp_form.form.kelvin.label }} {{ lamp_form.form.kelvin(class_="form-control") }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+        <div class="d-flex justify-content-between mt-4">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Zurück</a>
+            <button type="submit" class="btn btn-success">Speichern</button>
+        </div>
+    </form>
+</div>
+<script>
+function deleteEnvImage(imgId) {
+    document.getElementById('delete_image_id').value = imgId;
+    document.querySelector('form[method=POST]').submit();
+}
+</script>
+{% endblock %}

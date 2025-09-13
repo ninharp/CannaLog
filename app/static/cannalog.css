@@ -1,0 +1,7 @@
+/* Einfaches zusätzliches Styling für Cannalog */
+body { background: #f8f9fa; }
+h1, h2, h3 { color: #2d4739; }
+.btn-success { background: #4caf50; border: none; }
+.btn-primary { background: #2d4739; border: none; }
+.list-group-item { background: #fff; }
+img { border-radius: 6px; margin-left: 10px; }

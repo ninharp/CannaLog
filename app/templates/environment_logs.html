@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}Logbuch: {{ env.name }}{% endblock %}
+{% block content %}
+<!-- entfernt: nicht mehr genutzt -->
+<div class="d-flex align-items-center justify-content-center mb-4" style="gap:1rem;">
+    <a href="{{ url_for('dashboard') }}">
+        <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" style="height:60px; width:auto; display:block; cursor:pointer;">
+    </a>
+    <h1 class="mb-0 fw-bold" style="font-size:2.2rem; line-height:60px;">Logbuch: {{ env.name }}</h1>
+</div>
+<div class="mb-3">
+    <a href="{{ url_for('environment_overview', env_id=env.id) }}" class="btn btn-secondary btn-sm">Zurück</a>
+    <a href="{{ url_for('add_environment_log', env_id=env.id) }}" class="btn btn-success btn-sm">+ Neuer Eintrag</a>
+</div>
+{% if logs %}
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Datum</th>
+            <th>Notizen</th>
+            <th>Messungen</th>
+            <th>Aktionen</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for log in logs %}
+        <tr>
+            <td>{{ log.date.strftime('%d.%m.%Y') }}</td>
+            <td>{{ log.notes|default('-') }}</td>
+            <td>
+                {% if log.measurements|length > 0 %}
+                    <span class="badge bg-info">{{ log.measurements|length }}</span>
+                {% else %}-{% endif %}
+            </td>
+            <td>
+                <a href="{{ url_for('edit_environment_log', log_id=log.id) }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
+                <form method="POST" action="{{ url_for('delete_environment_log', log_id=log.id) }}" style="display:inline;" onsubmit="return confirm('Log-Eintrag wirklich löschen?');">
+                    <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
+                </form>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Keine Log-Einträge vorhanden.</p>
+{% endif %}
+{% endblock %}
