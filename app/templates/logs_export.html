@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if pdf_export %}
+    <div style="position:relative; margin-bottom: 1.5em; min-height:80px;">
+      <div style="position:absolute; right:0; top:0; font-size:0.95em; color:#888;">{{ generated_at }}</div>
+      <div style="text-align:center;">
+        {% if logo_b64 %}
+          <img src="{{ logo_b64 }}" alt="Logo" style="height:70px; margin-bottom:0.5em;">
+        {% else %}
+          <span style="font-size:2em;">Cannalog</span>
+        {% endif %}
+        <h2 style="margin:0.2em 0 0.5em 0;">Bericht</h2>
+      </div>
+    </div>
+{% else %}
+  <h2>Log-Export</h2>
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+      {{ form.environment_id.label }}<br>
+      {{ form.environment_id(class="form-select", id="env-select") }}
+    </div>
+    <div class="mb-3">
+      {{ form.plant_ids.label }}<br>
+      {{ form.plant_ids(class="form-select", multiple=true, id="plant-select") }}
+    </div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const envSelect = document.getElementById('env-select');
+        const plantSelect = document.getElementById('plant-select');
+        function updatePlants() {
+          const envId = envSelect.value;
+          fetch(`api/environment/${envId}/plants`)
+            .then(resp => resp.json())
+            .then(plants => {
+              plantSelect.innerHTML = '';
+              for (const [id, name] of plants) {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = name;
+                plantSelect.appendChild(opt);
+              }
+            });
+        }
+        envSelect.addEventListener('change', updatePlants);
+        if (envSelect.value) updatePlants();
+      });
+    </script>
+    <div class="mb-3">
+      {{ form.include_env_logs() }} {{ form.include_env_logs.label }}<br>
+      {{ form.include_plant_logs() }} {{ form.include_plant_logs.label }}<br>
+      {{ form.include_action_logs() }} {{ form.include_action_logs.label }}
+    </div>
+    <div class="d-flex justify-content-between mb-3">
+      <a href="{{ request.referrer or url_for('dashboard')|relative_url }}" class="btn btn-secondary">Zurück</a>
+      <div>
+        <button type="submit" class="btn btn-secondary">Bericht anzeigen</button>
+        <button type="submit" name="pdf" value="1" class="btn btn-outline-primary ms-2"><span class="bi bi-file-earmark-pdf"></span> PDF Export</button>
+      </div>
+    </div>
+  </form>
+{% endif %}
+
+{% if logs is not none %}
+  {% set env = environments|selectattr('id', 'equalto', form.environment_id.data)|first %}
+  <div style="margin-bottom:1.2em;">
+    <h3 style="margin-bottom:0.2em;">{{ env.name }}</h3>
+    <div style="font-size:1.05em;">
+      {% if env.length and env.width and env.height %}
+        Größe: {{ env.length|round(2) }}m × {{ env.width|round(2) }}m × {{ env.height|round(2) }}m<br>
+      {% endif %}
+      {% if env.notes %}Notizen: {{ env.notes }}<br>{% endif %}
+      Lampen: {% if env.lamps|length == 0 %}keine{% else %}
+        {% for lamp in env.lamps %}
+          {{ lamp.type|capitalize }}{% if lamp.power %} ({{ lamp.power }}W){% endif %}{% if not loop.last %}, {% endif %}
+        {% endfor %}{% endif %}
+      <br>
+      Wassersteuerung: {% if env.auto_watering %}Ja{% else %}Nein{% endif %} | Lichtsteuerung: {% if env.light_enabled %}Ja{% else %}Nein{% endif %}
+      {% if env.exposure_time %}| Zyklus: {{ env.exposure_time }}h{% endif %}
+    </div>
+  </div>
+  <div style="height:0.7em;"></div>
+  {% set env_logs = logs|selectattr('__class__.__name__', 'equalto', 'EnvironmentLog')|list %}
+  {% set plant_logs = logs|selectattr('__class__.__name__', 'equalto', 'PlantLog')|list %}
+  {% set action_logs = logs|selectattr('__class__.__name__', 'equalto', 'PlantActionLog')|list %}
+  {% set combined = [] %}
+  {% for log in plant_logs %}
+    {% set plant = log.plant if log.plant is defined and log.plant else (plants|selectattr('id', 'equalto', log.plant_id)|first) %}
+    {% set _ = combined.append({'type': 'plant', 'log': log, 'date': log.date, 'plant': plant}) %}
+  {% endfor %}
+  {% for log in action_logs %}
+    {% set _ = combined.append({'type': 'action', 'log': log, 'date': log.date, 'plant': log.plant}) %}
+  {% endfor %}
+  {% set combined = combined|sort(attribute='date', reverse=True) %}
+
+  {# Mapping for measurement type display names #}
+  {% set plant_type_map = dict(MEASUREMENT_TYPES) %}
+  {% set env_type_map = dict(ENV_MEASUREMENT_TYPES) %}
+
+  {% if env_logs %}
+    <h4>Umgebungs-Logs</h4>
+    <table class="table table-bordered table-sm" style="width:100%;">
+      <thead><tr><th>Datum</th><th>Notizen</th><th>Messungen</th></tr></thead>
+      <tbody>
+      {% for log in env_logs %}
+        <tr>
+          <td>{{ log.date.strftime('%d.%m.%Y') }}</td>
+          <td>{{ log.notes }}</td>
+          <td>
+            {% for m in log.measurements %}
+              <div>{{ env_type_map.get(m.type, m.type) }}: {{ m.value }} {% if m.min_value %}(min: {{ m.min_value }}){% endif %}{% if m.max_value %}(max: {{ m.max_value }}){% endif %}</div>
+            {% endfor %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  <br/>
+
+  {% if combined %}
+    <h4>Pflanzen-Logs</h4>
+    {% set plant_entries = {} %}
+    {# Gruppiere alle Einträge nach Pflanze #}
+    {% for entry in combined %}
+      {% set plant = entry.plant %}
+      {% if plant %}
+        {% if plant.id not in plant_entries %}
+          {% set _ = plant_entries.update({plant.id: {'plant': plant, 'entries': []}}) %}
+        {% endif %}
+        {% set _ = plant_entries[plant.id]['entries'].append(entry) %}
+      {% endif %}
+    {% endfor %}
+    {% for plant_id, data in plant_entries.items() %}
+      {% set plant = data['plant'] %}
+      <div style="height:0.7em;"></div>
+      <div style="margin-bottom:1.2em;">
+        <div style="font-size:1.05em;">
+            Pflanze: {{ plant.pflanzenname }} | Anzahl: {{ plant_counts[plant.id] if plant_counts and plant.id in plant_counts else 1 }} | Strain: {{ plant.strain }} | Medium: {{ media_type_map.get(plant.medium_type, plant.medium_type|capitalize) }}
+            {% if plant.notes %}<br><span>Notizen: {{ plant.notes }}</span>{% endif %}
+        </div>
+      </div>
+
+      <table class="table table-bordered table-sm" style="width:100%; margin-bottom:1.5em;">
+        <thead>
+          <tr>
+            <th>Datum</th>
+            <th>Pflanze</th>
+            <th>Aktion/Notizen</th>
+            <th>Messungen</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for entry in data['entries']|sort(attribute='date', reverse=True) %}
+          <tr>
+            <td>{{ entry.date.strftime('%d.%m.%Y') }}</td>
+            <td>{{ plant.pflanzenname }}</td>
+            <td>
+              {% if entry.type == 'plant' %}
+                {{ entry.log.notes }}
+              {% else %}
+                {{ entry.log.action|capitalize }}{% if entry.log.notes %}: {{ entry.log.notes }}{% endif %}
+              {% endif %}
+            </td>
+            <td>
+              {% if entry.type == 'plant' %}
+                {% for m in entry.log.measurements %}
+                  <div>{{ plant_type_map.get(m.type, m.type) }}: {{ m.value }} {% if m.min_value %}(min: {{ m.min_value }}){% endif %}{% if m.max_value %}(max: {{ m.max_value }}){% endif %}</div>
+                {% endfor %}
+              {% else %}-{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% endfor %}
+  {% endif %}
+{% endif %}
+
+{% endblock %}

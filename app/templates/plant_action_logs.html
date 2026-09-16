@@ -2,14 +2,14 @@
 {% block title %}Pflanzenaktionen{% endblock %}
 {% block content %}
 <div class="d-flex align-items-center justify-content-center mb-4" style="gap:1rem;">
-    <a href="{{ url_for('dashboard') }}">
-        <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" style="height:60px; width:auto; display:block; cursor:pointer;">
+    <a href="dashboard">
+        <img src="static/assets/logo_small.png" alt="Logo" style="height:60px; width:auto; display:block; cursor:pointer;">
     </a>
     <h1 class="mb-0 fw-bold" style="font-size:2.2rem; line-height:60px;">Pflanzenaktionen</h1>
 </div>
 <!-- entfernt: nicht mehr genutzt -->
 <div class="mb-3">
-    <a href="{{ url_for('add_plant_action_log') }}" class="btn btn-success btn-sm">+ Neue Aktion</a>
+    <a href="plant_actions/add" class="btn btn-success btn-sm">+ Neue Aktion</a>
 </div>
 {% if logs %}
 <table class="table table-striped">
@@ -30,8 +30,8 @@
             <td>{{ log.action|capitalize }}</td>
             <td>{{ log.notes|default('-') }}</td>
             <td>
-                <a href="{{ url_for('edit_plant_action_log', log_id=log.id) }}" class="btn btn-sm btn-primary">Bearbeiten</a>
-                <form method="POST" action="{{ url_for('delete_plant_action_log', log_id=log.id) }}" style="display:inline;" onsubmit="return confirm('Aktion wirklich löschen?');">
+                <a href="plant_actions/{{ log.id }}/edit" class="btn btn-sm btn-primary">Bearbeiten</a>
+                <form method="POST" action="plant_actions/{{ log.id }}/delete" style="display:inline;" onsubmit="return confirm('Aktion wirklich löschen?');">
                     <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
                 </form>
             </td>

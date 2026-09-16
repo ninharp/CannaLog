@@ -3,8 +3,8 @@
 {% block content %}
 <div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
     <div class="d-flex align-items-center mb-4" style="gap:1rem;">
-        <a href="{{ url_for('dashboard') }}">
-            <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" style="height:60px; width:auto; display:block; cursor:pointer;">
+        <a href="dashboard">
+            <img src="static/assets/logo_small.png" alt="Logo" style="height:60px; width:auto; display:block; cursor:pointer;">
         </a>
         <h1 class="mb-0 fw-bold" style="font-size:2.2rem; line-height:60px;">Bilder hochladen</h1>
     </div>
@@ -32,7 +32,7 @@
         {% for error in form.images.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
     </div>
     <div class="d-flex justify-content-between align-items-center mt-4">
-        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Zurück</a>
+    <a href="dashboard" class="btn btn-secondary">Zurück</a>
         <button type="submit" class="btn btn-success">Hochladen</button>
     </div>
 </form>

@@ -1,4 +1,6 @@
 from app import db
+from flask_login import UserMixin
+from datetime import datetime
 
 class PlantActionLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -29,15 +31,11 @@ class Measurement(db.Model):
     max_value = db.Column(db.Float)
     plant_log_id = db.Column(db.Integer, db.ForeignKey('plant_log.id'))
     environment_log_id = db.Column(db.Integer, db.ForeignKey('environment_log.id'))
-from app import db
+
 class EnvironmentImage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     environment_id = db.Column(db.Integer, db.ForeignKey('environment.id'), nullable=False)
     filename = db.Column(db.String(200), nullable=False)
-
-from app import db
-from flask_login import UserMixin
-from datetime import datetime
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -62,7 +60,6 @@ class Environment(db.Model):
     plants = db.relationship('Plant', backref='environment', lazy=True)
     lamps = db.relationship('Lamp', back_populates='environment', cascade='all, delete-orphan')
 
-
 class PlantImage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     plant_id = db.Column(db.Integer, db.ForeignKey('plant.id'), nullable=False)
@@ -83,3 +80,4 @@ class Plant(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     images = db.relationship('PlantImage', backref='plant', lazy=True, cascade='all, delete-orphan', foreign_keys='PlantImage.plant_id')
     preview_image_id = db.Column(db.Integer, db.ForeignKey('plant_image.id'), nullable=True)
+    actions = db.relationship('PlantActionLog', backref='plant_action_parent', cascade='all, delete-orphan')

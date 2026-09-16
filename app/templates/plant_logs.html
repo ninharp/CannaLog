@@ -2,18 +2,18 @@
 {% block title %}Logbuch: {{ plant.pflanzenname }}{% endblock %}
 {% block content %}
 <div class="d-flex align-items-center justify-content-center mb-4" style="gap:1rem;">
-    <a href="{{ url_for('dashboard') }}">
-        <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" style="height:60px; width:auto; display:block; cursor:pointer;">
+    <a href="dashboard">
+    <img src="static/assets/logo_small.png" alt="Logo" style="height:60px; width:auto; display:block; cursor:pointer;">
     </a>
     <h1 class="mb-0 fw-bold" style="font-size:2.2rem; line-height:60px;">Logbuch: {{ plant.pflanzenname }}</h1>
 </div>
 <div class="d-flex justify-content-between align-items-center mb-3" style="gap:1rem;">
     <div>
-        <a href="{{ url_for('plant_overview', plant_id=plant.id) }}" class="btn btn-secondary btn-sm">Zurück</a>
+    <a href="plant/{{ plant.id }}" class="btn btn-secondary btn-sm">Zurück</a>
     </div>
     <div class="d-flex gap-2">
-        <a href="{{ url_for('add_plant_log', plant_id=plant.id) }}" class="btn btn-success btn-sm">+ Neuer Eintrag</a>
-        <a href="{{ url_for('add_plant_action_log') }}?plant_id={{ plant.id }}" class="btn btn-info btn-sm">+ Aktion eintragen</a>
+    <a href="plant/{{ plant.id }}/logs/add" class="btn btn-success btn-sm">+ Neuer Eintrag</a>
+    <a href="plant_actions/add?plant_id={{ plant.id }}" class="btn btn-info btn-sm">+ Aktion eintragen</a>
     </div>
 </div>
 <!-- entfernt: nicht mehr genutzt -->
@@ -58,21 +58,11 @@
                         <span class="text-muted">-</span>
                     {% endif %}
                 {% elif entry.type == 'action' %}
-                    <span class="badge bg-warning text-dark">A</span> {{ entry.obj.action|capitalize }}
+                    <span class="text-muted">-</span>
                 {% endif %}
             </td>
             <td>
-                {% if entry.type == 'log' %}
-                    <a href="{{ url_for('edit_plant_log', log_id=entry.obj.id) }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
-                    <form method="POST" action="{{ url_for('delete_plant_log', log_id=entry.obj.id) }}" style="display:inline;" onsubmit="return confirm('Log-Eintrag wirklich löschen?');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
-                    </form>
-                {% elif entry.type == 'action' %}
-                    <a href="{{ url_for('edit_plant_action_log', log_id=entry.obj.id) }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
-                    <form method="POST" action="{{ url_for('delete_plant_action_log', log_id=entry.obj.id) }}" style="display:inline;" onsubmit="return confirm('Aktion wirklich löschen?');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
-                    </form>
-                {% endif %}
+                <!-- Aktionen-Buttons hier, falls benötigt -->
             </td>
         </tr>
     {% endfor %}

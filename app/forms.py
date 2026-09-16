@@ -1,6 +1,20 @@
-
+# --- Log-Export Formular ---
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, DateField, IntegerField, FileField, SelectField, FloatField, FieldList, FormField, MultipleFileField
+from flask_wtf.file import FileAllowed
+from flask_login import current_user
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, DateField, IntegerField, FileField, SelectField, FloatField, FieldList, FormField, MultipleFileField, SelectMultipleField
+from wtforms.validators import DataRequired, Length, EqualTo, ValidationError, Optional
+from datetime import date as dt_date
+from app.models import Plant
+
+class LogExportForm(FlaskForm):
+    environment_id = SelectField('Umgebung', coerce=int, validators=[DataRequired()])
+    plant_ids = SelectMultipleField('Pflanzen', coerce=int)
+    include_env_logs = BooleanField('Umgebungs-Logs', default=True)
+    include_plant_logs = BooleanField('Pflanzen-Logs', default=True)
+    include_action_logs = BooleanField('Aktions-Logs', default=True)
+    as_pdf = BooleanField('Als PDF exportieren')
+    submit = SubmitField('Exportieren')
 
 # Aktionen für Pflanzenaktions-Log
 PLANT_ACTIONS = [
@@ -18,13 +32,6 @@ PLANT_ACTIONS = [
     ('sonstiges', 'Sonstiges'),
 ]
 
-
-
-from wtforms.validators import DataRequired, Optional
-from datetime import date as dt_date
-from app.models import Plant
-from flask_login import current_user
-
 class PlantActionLogForm(FlaskForm):
     class Meta:
         csrf = True
@@ -33,12 +40,6 @@ class PlantActionLogForm(FlaskForm):
     action = SelectField('Aktion', choices=PLANT_ACTIONS, validators=[DataRequired()])
     notes = TextAreaField('Notizen', validators=[Optional()])
     submit = SubmitField('Speichern')
-
-from wtforms.validators import DataRequired, Length, EqualTo, ValidationError, Optional
-from flask_wtf.file import FileAllowed
-from datetime import date as dt_date
-
-
 
 # Messungstypen für Pflanzen-Log
 MEASUREMENT_TYPES = [
@@ -64,7 +65,28 @@ ENV_MEASUREMENT_TYPES = [
     ('vpd', 'VPD (kPa)'),
 ]
 
+ENV_LAMP_TYPES = [
+    ('led', 'LED'),
+    ('hps', 'Hochdruck-Natriumdampf (HPS)'),
+    ('cfl', 'Kompaktleuchstofflampe (CFL)'),
+    ('mh', 'Metallhalogen (MH)'),
+    ('sonstige', 'Sonstige')
+]
 
+ENV_MEDIA_TYPES = [
+    ('erde', 'Erde'), 
+    ('hydro', 'Hydro'), 
+    ('kokos', 'Kokos')
+]
+
+ENV_PHASE_TYPES = [
+    ('Keimung', 'Keimung'), 
+    ('Sämling', 'Sämling'), 
+    ('Wachstum', 'Wachstum'), 
+    ('Blüte', 'Blüte'), 
+    ('Trocknung', 'Trocknung'), 
+    ('Fermentierung', 'Fermentierung')
+]
 
 class MeasurementForm(FlaskForm):
     class Meta:
@@ -98,15 +120,11 @@ class EnvironmentLogForm(FlaskForm):
     notes = TextAreaField('Notizen', validators=[Optional()])
     measurements = FieldList(FormField(EnvironmentMeasurementForm), min_entries=1, max_entries=6)
     submit = SubmitField('Speichern')
-from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, DateField, IntegerField, FileField, SelectField, FloatField, FieldList, FormField, MultipleFileField
-from wtforms.validators import DataRequired, Length, EqualTo, ValidationError, Optional
-from flask_wtf.file import FileAllowed
 
 class LampForm(FlaskForm):
     class Meta:
         csrf = False
-    type = SelectField('Lampentyp', choices=[('LED', 'LED'), ('HPS', 'HPS'), ('CFL', 'CFL'), ('MH', 'MH'), ('Sonstige', 'Sonstige')], validators=[DataRequired()])
+    type = SelectField('Lampentyp', choices=ENV_LAMP_TYPES, validators=[DataRequired()])
     power = IntegerField('Leistung (Watt)', validators=[DataRequired()])
     kelvin = IntegerField('Farbtemperatur (K)', validators=[Optional()])  # optional
 
@@ -122,16 +140,14 @@ class LoginForm(FlaskForm):
     remember = BooleanField('Angemeldet bleiben')
     submit = SubmitField('Login')
 
-from datetime import date as dt_date
-
 class PlantForm(FlaskForm):
     pflanzenname = StringField('Pflanzenname', validators=[DataRequired()])
     date = DateField('Datum', format='%Y-%m-%d', default=dt_date.today)
     count = IntegerField('Anzahl Pflanzen', default=1)
-    medium_type = SelectField('Medientyp', choices=[('Erde', 'Erde'), ('Hydro', 'Hydro'), ('Kokos', 'Kokos')], validators=[DataRequired()])
+    medium_type = SelectField('Medientyp', choices=ENV_MEDIA_TYPES, validators=[DataRequired()])
     medium_notes = TextAreaField('Medienbeschreibung/Notizen')
     strain = StringField('Strain', default='Unbekannter Strain', render_kw={"autocomplete": "off"})
-    phase = SelectField('Phase', choices=[('Keimung', 'Keimung'), ('Sämling', 'Sämling'), ('Wachstum', 'Wachstum'), ('Blüte', 'Blüte'), ('Trocknung', 'Trocknung'), ('Fermentierung', 'Fermentierung')], validators=[DataRequired()])
+    phase = SelectField('Phase', choices=ENV_PHASE_TYPES, validators=[DataRequired()])
     notes = TextAreaField('Notizen')
     images = MultipleFileField('Bilder', validators=[FileAllowed(['jpg', 'jpeg', 'png'], 'Nur Bilder erlaubt!')])
     environment_id = SelectField('Umgebung', coerce=int)

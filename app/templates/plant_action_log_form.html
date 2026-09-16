@@ -3,8 +3,8 @@
 {% block content %}
 <div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
     <div class="d-flex align-items-center mb-4" style="gap:1rem;">
-        <a href="{{ url_for('dashboard') }}">
-        <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" class="logo-small" style="height:60px; width:auto; display:block; cursor:pointer;">
+    <a href="dashboard">
+    <img src="static/assets/logo_small.png" alt="Logo" class="logo-small" style="height:60px; width:auto; display:block; cursor:pointer;">
         </a>
         <h1 class="mb-0 fw-bold" style="font-size:1.8rem; line-height:60px;">Aktion hinzufügen</h1>
     </div>
@@ -44,9 +44,9 @@
         <div>
             {% set pid = form.plant_id.data if form.plant_id.data else (log.plant_id if edit and log else None) %}
             {% if pid %}
-                <a href="{{ url_for('plant_overview', plant_id=pid) }}" class="btn btn-secondary">Zurück</a>
+                <a href="plant/{{ pid }}" class="btn btn-secondary">Zurück</a>
             {% else %}
-                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Zurück</a>
+                <a href="dashboard" class="btn btn-secondary">Zurück</a>
             {% endif %}
         </div>
         <div class="d-flex gap-2">
@@ -56,7 +56,7 @@
 </form>
 {% if edit %}
 <div class="d-flex justify-content-end mt-2">
-    <form method="POST" action="{{ url_for('delete_plant_action_log', log_id=log.id) }}" onsubmit="return confirm('Aktion wirklich löschen?');" style="display:inline;">
+    <form method="POST" action="plant_actions/{{ log.id }}/delete" onsubmit="return confirm('Aktion wirklich löschen?');" style="display:inline;">
         <button type="submit" class="btn btn-danger">Löschen</button>
     </form>
 </div>

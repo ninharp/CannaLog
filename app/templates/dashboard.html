@@ -4,14 +4,15 @@
 
 
 <div class="mb-2 d-flex justify-content-center align-items-center" style="height:100px;">
-    <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" class="logo-small" style="height:100px; width:auto; display:inline-block; vertical-align:middle;">
+    <img src="{{ url_for('static', filename='assets/logo_small.png')|relative_url }}" alt="Logo" class="logo-small" style="height:100px; width:auto; display:inline-block; vertical-align:middle;">
     <h1 class="mb-0 d-inline-block align-middle" style="line-height:100px; vertical-align:middle; margin-left:1rem; margin-right:1.5rem;">Dashboard</h1>
 </div>
 
-<!-- Schnellaktions-Buttons -->
-<div class="d-flex justify-content-center gap-3 mb-4">
+<!-- Schnellaktions-Buttons + Export-Button -->
+<div class="d-flex justify-content-center gap-3 mb-4 align-items-center">
+    <!-- Schnellaktions-Buttons -->
     {% if plants %}
-        <a href="{{ url_for('add_plant_action_log') }}" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width:60px; height:60px; font-size:1.7rem;">
+        <a href="{{ url_for('add_plant_action_log')|relative_url }}" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width:60px; height:60px; font-size:1.7rem;">
             <span>⚡</span>
         </a>
     {% else %}
@@ -20,7 +21,7 @@
         </span>
     {% endif %}
     {% if plants or environments %}
-        <a href="{{ url_for('add_image_global') }}" class="btn btn-info rounded-circle d-flex align-items-center justify-content-center" style="width:60px; height:60px; font-size:1.7rem;">
+        <a href="{{ url_for('add_image_global')|relative_url }}" class="btn btn-info rounded-circle d-flex align-items-center justify-content-center" style="width:60px; height:60px; font-size:1.7rem;">
             <span>🖼️</span>
         </a>
     {% else %}
@@ -29,7 +30,7 @@
         </span>
     {% endif %}
     {% if plants %}
-        <a href="{{ url_for('add_plant_log_global') }}" class="btn btn-success rounded-circle d-flex align-items-center justify-content-center" style="width:60px; height:60px; font-size:1.7rem;">
+        <a href="{{ url_for('add_plant_log_global')|relative_url }}" class="btn btn-success rounded-circle d-flex align-items-center justify-content-center" style="width:60px; height:60px; font-size:1.7rem;">
             <span class="bi bi-journal-plus"></span>
         </a>
     {% else %}
@@ -38,7 +39,7 @@
         </span>
     {% endif %}
     {% if environments %}
-        <a href="{{ url_for('add_environment_log_global') }}" class="btn btn-warning rounded-circle d-flex align-items-center justify-content-center" style="width:60px; height:60px; font-size:1.7rem;">
+        <a href="{{ url_for('add_environment_log_global')|relative_url }}" class="btn btn-warning rounded-circle d-flex align-items-center justify-content-center" style="width:60px; height:60px; font-size:1.7rem;">
             <span class="bi-journal-plus"></span>
         </a>
     {% else %}
@@ -46,34 +47,37 @@
             <span class="bi-journal-plus"></span>
         </span>
     {% endif %}
-    <!-- Logout-Button entfernt, stattdessen unten als Text-Link -->
+    <!-- Export-Button rechts -->
+    <a href="{{ url_for('export_logs')|relative_url }}" class="btn d-flex align-items-center justify-content-center" style="background:#8e44ad; color:white; border-radius:50%; width:60px; height:60px; font-size:1.7rem; box-shadow:0 2px 8px #0001;">
+        <span class="bi bi-download"></span>
+    </a>
 </div>
 
 <div class="mx-auto" style="max-width: 600px; min-width:0; width:100%;">
-    <h3>Umgebungen <a href="{{ url_for('add_environment') }}" class="btn btn-success btn-sm">+</a></h3>
+    <h3>Umgebungen <a href="{{ url_for('add_environment')|relative_url }}" class="btn btn-success btn-sm">+</a></h3>
     <ul class="list-group mb-4">
         {% for env in environments %}
         <li class="list-group-item d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center">
                 {% if env.preview_img %}
-                    <a href="{{ url_for('environment_overview', env_id=env.id) }}">
-                        <img src="{{ url_for('uploaded_file', filename=env.preview_img.filename) }}" alt="Bild" class="me-2" style="width:56px; height:56px; object-fit:cover; border-radius:6px;">
+                    <a href="{{ url_for('environment_overview', env_id=env.id)|relative_url }}">
+                        <img src="{{ url_for('uploaded_file', filename=env.preview_img.filename)|relative_url }}" alt="Bild" class="me-2" style="width:56px; height:56px; object-fit:cover; border-radius:6px;">
                     </a>
                 {% else %}
-                    <a href="{{ url_for('environment_overview', env_id=env.id) }}">
+                    <a href="{{ url_for('environment_overview', env_id=env.id)|relative_url }}">
                         <div class="me-2" style="width:56px; height:56px; background:#e9ecef; border-radius:6px;"></div>
                     </a>
                 {% endif %}
                 <div>
-                    <a href="{{ url_for('environment_overview', env_id=env.id) }}" style="text-decoration:none; color:inherit;">
+                    <a href="{{ url_for('environment_overview', env_id=env.id)|relative_url }}" style="text-decoration:none; color:inherit;">
                         <strong>{{ env.name }}</strong>
                     </a>
                     <span class="d-block small text-muted">Autom. Bewässerung: {{ 'Ja' if env.auto_watering else 'Nein' }} | Belichtungszeit: {{ env.exposure_time }}h</span>
                 </div>
             </div>
             <div>
-                <a href="{{ url_for('edit_environment', env_id=env.id) }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
-                <form method="POST" action="{{ url_for('delete_environment', env_id=env.id) }}" style="display:inline;" onsubmit="return confirmDeleteEnvironment({{ env.plants|length }}, this);">
+                <a href="{{ url_for('edit_environment', env_id=env.id)|relative_url }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
+                <form method="POST" action="{{ url_for('delete_environment', env_id=env.id)|relative_url }}" style="display:inline;" onsubmit="return confirmDeleteEnvironment({{ env.plants|length }}, this);">
                     <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
                 </form>
             </div>
@@ -83,22 +87,22 @@
         {% endfor %}
     </ul>
 
-    <h3>Pflanzen <a href="{{ url_for('add_plant') }}" class="btn btn-success btn-sm">+</a></h3>
+    <h3>Pflanzen <a href="{{ url_for('add_plant')|relative_url }}" class="btn btn-success btn-sm">+</a></h3>
     <ul class="list-group mb-4">
         {% for plant in plants %}
         <li class="list-group-item d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center">
                 {% if plant.preview_img %}
-                    <a href="{{ url_for('plant_overview', plant_id=plant.id) }}">
-                        <img src="{{ url_for('uploaded_file', filename=plant.preview_img.filename) }}" alt="Bild" class="me-2" style="width:56px; height:56px; object-fit:cover; border-radius:6px;">
+                    <a href="{{ url_for('plant_overview', plant_id=plant.id)|relative_url }}">
+                        <img src="{{ url_for('uploaded_file', filename=plant.preview_img.filename)|relative_url }}" alt="Bild" class="me-2" style="width:56px; height:56px; object-fit:cover; border-radius:6px;">
                     </a>
                 {% else %}
-                    <a href="{{ url_for('plant_overview', plant_id=plant.id) }}">
+                    <a href="{{ url_for('plant_overview', plant_id=plant.id)|relative_url }}">
                         <div class="me-2" style="width:56px; height:56px; background:#e9ecef; border-radius:6px;"></div>
                     </a>
                 {% endif %}
                 <div>
-                    <a href="{{ url_for('plant_overview', plant_id=plant.id) }}" style="text-decoration:none; color:inherit;">
+                    <a href="{{ url_for('plant_overview', plant_id=plant.id)|relative_url }}" style="text-decoration:none; color:inherit;">
                         <strong>{{ plant.pflanzenname }}</strong>
                     </a>
                     <span class="badge bg-light text-dark border ms-2">Anzahl: {{ plant.count }}</span>
@@ -108,8 +112,8 @@
                 </div>
             </div>
             <div>
-                <a href="{{ url_for('edit_plant', plant_id=plant.id) }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
-                <form method="POST" action="{{ url_for('delete_plant', plant_id=plant.id) }}" style="display:inline;" onsubmit="return confirm('Pflanze wirklich löschen? Alle zugehörigen Bilder werden entfernt!');">
+                <a href="{{ url_for('edit_plant', plant_id=plant.id)|relative_url }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
+                <form method="POST" action="{{ url_for('delete_plant', plant_id=plant.id)|relative_url }}" style="display:inline;" onsubmit="return confirm('Pflanze wirklich löschen? Alle zugehörigen Bilder werden entfernt!');">
                     <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
                 </form>
             </div>
@@ -142,7 +146,7 @@ function confirmDeleteEnvironment(plantCount, form) {
     </script>
 
 <div class="text-center mt-5 mb-3">
-    <a href="{{ url_for('logout') }}" style="color:#888; text-decoration:underline; font-size:1.08em;">Ausloggen</a>
+    <a href="{{ url_for('logout')|relative_url }}" style="color:#888; text-decoration:underline; font-size:1.08em;">Ausloggen</a>
 </div>
 {% endblock %}
 

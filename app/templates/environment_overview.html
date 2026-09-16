@@ -4,12 +4,11 @@
 
 <div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
     <div class="d-flex align-items-center mb-4" style="gap:1rem;">
-        <a href="{{ url_for('dashboard') }}">
-        <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" class="logo-small" style="height:60px; width:auto; display:block; cursor:pointer;">
+        <a href="dashboard">
+        <img src="{{ url_for('static', filename='assets/logo_small.png')|relative_url }}" alt="Logo" class="logo-small" style="height:60px; width:auto; display:block; cursor:pointer;">
         </a>
         <h1 class="mb-0 fw-bold" style="font-size:2.5rem; line-height:60px;">{{ env.name }}</h1>
     </div>
-
 
 {% set preview_img = None %}
 {% if env.preview_image_id %}
@@ -22,7 +21,7 @@
 {% endif %}
 {% if preview_img %}
     <div class="mb-3">
-        <img src="{{ url_for('uploaded_file', filename=preview_img.filename) }}" alt="Vorschaubild" width="180" style="border-radius:8px;">
+        <img src="uploads/{{ preview_img.filename }}" alt="Vorschaubild" width="180" style="border-radius:8px;">
     </div>
 {% endif %}
 
@@ -49,7 +48,7 @@
     {% for plant in plants %}
     <li class="list-group-item d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center">
-            <a href="{{ url_for('plant_overview', plant_id=plant.id) }}" style="text-decoration:none; color:inherit;">
+            <a href="plant/{{ plant.id }}" style="text-decoration:none; color:inherit;">
                 <strong>{{ plant.pflanzenname }}</strong>
             </a>
             <span class="badge bg-light text-dark border ms-2">Anzahl: {{ plant.count }}</span>
@@ -57,37 +56,36 @@
                 <span class="text-muted ms-2">({{ plant.environment.name }})</span>
             {% endif %}
             {% if plant.images and plant.images|length > 0 %}
-                <img src="{{ url_for('uploaded_file', filename=plant.images[0].filename) }}" alt="Bild" width="50" class="ms-2" style="border-radius:6px;">
+                <img src="uploads/{{ plant.images[0].filename }}" alt="Bild" width="50" class="ms-2" style="border-radius:6px;">
             {% endif %}
         </div>
         <div>
-            <a href="{{ url_for('edit_plant', plant_id=plant.id) }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
-            <form method="POST" action="{{ url_for('delete_plant', plant_id=plant.id) }}" style="display:inline;" onsubmit="return confirm('Pflanze wirklich löschen? Alle zugehörigen Bilder werden entfernt!');">
+            <a href="plant/{{ plant.id }}/edit" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
+            <form method="POST" action="plant/{{ plant.id }}/delete" style="display:inline;" onsubmit="return confirm('Pflanze wirklich löschen? Alle zugehörigen Bilder werden entfernt!');">
                 <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
             </form>
         </div>
     </li>
     {% else %}
-    <li class="list-group-item">Keine Pflanzen in dieser Umgebung. Mit <span class="btn btn-outline-success btn-sm px-2 py-0" style="font-size:1.2rem; pointer-events:none;">+</span> kannst du eine neue Pflanze hinzufügen.</li>
+    <li class="list-group-item">Keine Pflanzen vorhanden.</li>
     {% endfor %}
 </ul>
 <div class="d-flex align-items-center gap-2 mb-4 justify-content-between">
     <div>
-        <a href="{{ url_for('add_plant', env_id=env.id) }}" class="btn btn-outline-success btn-sm" title="Pflanze hinzufügen" style="font-size:1.2rem; padding:0.2em 0.7em;">+</a>
+        <a href="plant/add?env_id={{ env.id }}" class="btn btn-outline-success btn-sm" title="Pflanze hinzufügen" style="font-size:1.2rem; padding:0.2em 0.7em;">+</a>
     </div>
     <div class="d-flex gap-2">
-        <a href="{{ url_for('edit_environment', env_id=env.id) }}" class="btn btn-outline-primary btn-sm" title="Umgebung bearbeiten">Bearbeiten</a>
-        <form method="POST" action="{{ url_for('delete_environment', env_id=env.id) }}" style="display:inline;" id="delete-env-form">
+        <a href="environment/{{ env.id }}/edit" class="btn btn-outline-primary btn-sm" title="Umgebung bearbeiten">Bearbeiten</a>
+        <form method="POST" action="environment/{{ env.id }}/delete" style="display:inline;" id="delete-env-form">
             <button type="submit" class="btn btn-danger btn-sm" title="Umgebung löschen">Löschen</button>
         </form>
     </div>
 </div>
 <!-- ...Logbuch und restlicher Inhalt... -->
 
-
 <h4 class="mt-5 mb-3">Logbuch</h4>
 <div class="mb-3">
-    <a href="{{ url_for('add_environment_log', env_id=env.id) }}" class="btn btn-success btn-sm">+ Neuer Log-Eintrag</a>
+    <a href="environment_log/add?env_id={{ env.id }}" class="btn btn-success btn-sm">+ Neuer Log-Eintrag</a>
 </div>
 <div class="table-responsive">
 {% if entries %}
@@ -126,8 +124,8 @@
                 {% endif %}
             </td>
             <td>
-                <a href="{{ url_for('edit_environment_log', log_id=log.id) }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
-                <form method="POST" action="{{ url_for('delete_environment_log', log_id=log.id) }}" style="display:inline;" onsubmit="return confirm('Log-Eintrag wirklich löschen?');">
+                <a href="environment/logs/{{ log.id }}/edit" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
+                <form method="POST" action="environment/logs/{{ log.id }}/delete" style="display:inline;" onsubmit="return confirm('Log-Eintrag wirklich löschen?');">
                     <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
                 </form>
             </td>
@@ -138,8 +136,11 @@
 {% else %}
 <p>Keine Log-Einträge vorhanden.</p>
 {% endif %}
-<div class="mt-5">
-    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Zurück</a>
+<div class="mt-5 d-flex align-items-center gap-2">
+    <a href="dashboard" class="btn btn-secondary">Zurück</a>
+    <a href="{{ url_for('export_logs', env_id=env.id)|relative_url }}" class="btn btn-secondary" style="background:#8e44ad; color:white;">
+        <span class="bi bi-download"></span>
+    </a>
 </div>
 <script>
     document.getElementById('delete-env-form').onsubmit = function(e) {
@@ -150,8 +151,8 @@
         if (second) {
             this.submit();
         } else {
-            fetch("{{ url_for('delete_environment', env_id=env.id) }}?move_plants=1", {method: 'POST'})
-                .then(() => window.location.href = "{{ url_for('dashboard') }}");
+            fetch("environment/{{ env.id }}/delete?move_plants=1", {method: 'POST'})
+                .then(() => window.location.href = "dashboard");
         }
     };
 </script>

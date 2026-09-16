@@ -3,7 +3,7 @@
 {% block content %}
 <div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
     <div class="d-flex align-items-center mb-4" style="gap:1rem;">
-        <img src="{{ url_for('static', filename='assets/logo_small.png') }}" alt="Logo" class="logo-small" style="height:60px; width:auto; display:block;">
+    <img src="static/assets/logo_small.png" alt="Logo" class="logo-small" style="height:60px; width:auto; display:block;">
         <h1 class="mb-0 fw-bold" style="font-size:1.8rem; line-height:60px;">Log-Eintrag {{ env.name }}</h1>
     </div>
     <form method="POST">
@@ -124,9 +124,9 @@
     <div class="d-flex justify-content-between align-items-center mt-4">
         <div>
             {% if global_mode %}
-                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Zurück</a>
+                <a href="dashboard" class="btn btn-secondary">Zurück</a>
             {% else %}
-                <a href="{{ url_for('environment_overview', env_id=env.id) }}" class="btn btn-secondary">Zurück</a>
+                <a href="environment/{{ env.id }}" class="btn btn-secondary">Zurück</a>
             {% endif %}
         </div>
         <div class="d-flex gap-2">
@@ -136,7 +136,7 @@
 </form>
 {% if edit %}
 <div class="d-flex justify-content-end mt-2">
-    <form method="POST" action="{{ url_for('delete_environment_log', log_id=log.id) }}" onsubmit="return confirm('Log-Eintrag wirklich löschen?');" style="display:inline;">
+    <form method="POST" action="environment/logs/{{ log.id }}/delete" onsubmit="return confirm('Log-Eintrag wirklich löschen?');" style="display:inline;">
         <button type="submit" class="btn btn-danger">Löschen</button>
     </form>
 </div>
