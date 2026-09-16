@@ -110,7 +110,33 @@ def relative_url_filter(url):
 
 @app.context_processor
 def inject_globals():
-    return dict(APP_VERSION=APP_VERSION, ALLOW_REGISTRATION=app.config['ALLOW_REGISTRATION'])
+    from app.forms import (ENV_LAMP_TYPES, ENV_MEASUREMENT_TYPES, ENV_MEDIA_TYPES,
+                           ENV_PHASE_TYPES, MEASUREMENT_TYPES, PLANT_ACTIONS)
+    labels = dict(MEASUREMENT_TYPES + ENV_MEASUREMENT_TYPES)
+    labels.pop('', None)
+    return dict(
+        APP_VERSION=APP_VERSION,
+        ALLOW_REGISTRATION=app.config['ALLOW_REGISTRATION'],
+        MEASUREMENT_LABELS=labels,
+        ACTION_LABELS=dict(PLANT_ACTIONS[1:]),
+        MEDIA_LABELS=dict(ENV_MEDIA_TYPES),
+        LAMP_LABELS=dict(ENV_LAMP_TYPES),
+        PHASES=[value for value, _ in ENV_PHASE_TYPES],
+    )
+
+
+@app.template_filter('num')
+def num_filter(value):
+    """German number formatting without trailing zeros: 6.0 -> 6, 1.25 -> 1,25."""
+    if value is None:
+        return ''
+    text = f'{value:.2f}'.rstrip('0').rstrip('.')
+    return text.replace('.', ',')
+
+
+@app.template_filter('datum')
+def datum_filter(value):
+    return value.strftime('%d.%m.%Y') if value else ''
 
 
 from app import routes, models  # noqa: E402,F401  (registers routes)

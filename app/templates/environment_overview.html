@@ -1,159 +1,125 @@
 {% extends 'base.html' %}
-{% block title %}Umgebung: {{ env.name }} - Cannalog{% endblock %}
+{% from '_ui.html' import icon, phase, reading %}
+{% block title %}{{ env.name }} – CannaLog{% endblock %}
 {% block content %}
+{% set preview = (env.images|selectattr('id', 'equalto', env.preview_image_id)|first) or (env.images|first) %}
 
-<div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
-    <div class="d-flex align-items-center mb-4" style="gap:1rem;">
-        <a href="dashboard">
-        <img src="{{ url_for('static', filename='assets/logo_small.png')|relative_url }}" alt="Logo" class="logo-small" style="height:60px; width:auto; display:block; cursor:pointer;">
-        </a>
-        <h1 class="mb-0 fw-bold" style="font-size:2.5rem; line-height:60px;">{{ env.name }}</h1>
-    </div>
-
-{% set preview_img = None %}
-{% if env.preview_image_id %}
-    {% for img in env.images %}
-        {% if img.id == env.preview_image_id %}{% set preview_img = img %}{% endif %}
-    {% endfor %}
-{% endif %}
-{% if not preview_img and env.images and env.images|length > 0 %}
-    {% set preview_img = env.images[0] %}
-{% endif %}
-{% if preview_img %}
-    <div class="mb-3">
-        <img src="uploads/{{ preview_img.filename }}" alt="Vorschaubild" width="180" style="border-radius:8px;">
-    </div>
-{% endif %}
-
-
-<div class="mb-4">
-    <div class="d-flex flex-wrap gap-3">
-        <span class="badge bg-light text-dark border"><strong>Größe:</strong> {{ env.length }} x {{ env.width }} x {{ env.height }} cm</span>
-        <span class="badge bg-light text-dark border"><strong>Belichtungszeit:</strong> {{ env.exposure_time }} h</span>
-        <span class="badge bg-light text-dark border"><strong>Autom. Bewässerung:</strong> {% if env.auto_watering %}<span style="color:green;">&#10003;</span>{% else %}<span style="color:red;">&#10007;</span>{% endif %}</span>
-        <span class="badge bg-light text-dark border"><strong>Lichtsteuerung:</strong> {% if env.light_enabled %}<span style="color:green;">&#10003;</span>{% else %}<span style="color:red;">&#10007;</span>{% endif %}</span>
-    </div>
+<div class="page-head">
+  <div class="page-head__title">
+    <a class="back" href="dashboard">{{ icon('back') }} Übersicht</a>
+    <h1>{{ env.name }}</h1>
+    <p>{{ plants|length }} {{ 'Pflanzeneintrag' if plants|length == 1 else 'Pflanzeneinträge' }}</p>
+  </div>
+  <div class="btn-row">
+    <a href="environment/{{ env.id }}/edit" class="btn">{{ icon('edit') }} Bearbeiten</a>
+    <a href="environment_log/add?env_id={{ env.id }}" class="btn btn--primary">{{ icon('sun') }} Klima erfassen</a>
+  </div>
 </div>
-{% if env.notes %}
-<div class="mb-4">
-    <div style="background:#f3f3f3; color:#444; border-radius:5px; padding:0.5em 1em; max-width:600px; text-align:left; font-size:0.98em; border:1px solid #e0e0e0;">
-        <span style="font-weight:600; color:#888;">Notizen:</span><br>
-        <span style="display:block; margin-top:0.3em;">{{ env.notes }}</span>
-    </div>
-</div>
-{% endif %}
 
-<h4>Pflanzen in dieser Umgebung</h4>
-<ul class="list-group mb-4">
-    {% for plant in plants %}
-    <li class="list-group-item d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center">
-            <a href="plant/{{ plant.id }}" style="text-decoration:none; color:inherit;">
-                <strong>{{ plant.pflanzenname }}</strong>
-            </a>
-            <span class="badge bg-light text-dark border ms-2">Anzahl: {{ plant.count }}</span>
-            {% if plant.environment %}
-                <span class="text-muted ms-2">({{ plant.environment.name }})</span>
-            {% endif %}
-            {% if plant.images and plant.images|length > 0 %}
-                <img src="uploads/{{ plant.images[0].filename }}" alt="Bild" width="50" class="ms-2" style="border-radius:6px;">
-            {% endif %}
-        </div>
-        <div>
-            <a href="plant/{{ plant.id }}/edit" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
-            <form method="POST" action="plant/{{ plant.id }}/delete" style="display:inline;" onsubmit="return confirm('Pflanze wirklich löschen? Alle zugehörigen Bilder werden entfernt!');">
-                <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
-            </form>
-        </div>
-    </li>
-    {% else %}
-    <li class="list-group-item">Keine Pflanzen vorhanden.</li>
-    {% endfor %}
-</ul>
-<div class="d-flex align-items-center gap-2 mb-4 justify-content-between">
+<div class="profile">
+  {% if preview %}
+    <img class="profile__photo" src="uploads/{{ preview.filename }}" alt="Foto von {{ env.name }}">
+  {% else %}
+    <a class="profile__photo profile__photo--empty" href="image/add" title="Foto hochladen">{{ icon('camera', 'Foto hochladen') }}</a>
+  {% endif %}
+  <div class="profile__body">
+    <dl class="stats">
+      <div class="stat"><dt>Grundfläche</dt><dd>{% if env.length and env.width %}{{ env.length|num }} × {{ env.width|num }} cm{% if env.height %}<small>{{ env.height|num }} cm hoch</small>{% endif %}{% else %}–{% endif %}</dd></div>
+      <div class="stat"><dt>Licht</dt><dd>{% if env.light_enabled %}{{ env.exposure_time }}/{{ 24 - (env.exposure_time or 0) }} h{% else %}ohne Steuerung{% endif %}</dd></div>
+      <div class="stat"><dt>Bewässerung</dt><dd>{{ 'automatisch' if env.auto_watering else 'manuell' }}</dd></div>
+      {% set watts = env.lamps|sum(attribute='power') %}
+      <div class="stat"><dt>Lampen</dt><dd>{% if env.lamps %}{{ watts }} W<small>{% for lamp in env.lamps %}{{ LAMP_LABELS.get(lamp.type, lamp.type)|replace(' (HPS)', '')|replace(' (CFL)', '')|replace(' (MH)', '') }}{% if lamp.kelvin %} {{ lamp.kelvin }} K{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</small>{% else %}–{% endif %}</dd></div>
+    </dl>
+    {% set latest = env.latest_measurements %}
+    {% if latest %}
     <div>
-        <a href="plant/add?env_id={{ env.id }}" class="btn btn-outline-success btn-sm" title="Pflanze hinzufügen" style="font-size:1.2rem; padding:0.2em 0.7em;">+</a>
+      <div class="label" style="margin-bottom:0.4rem">Letztes Klima</div>
+      <ul class="readings">{% for key, pair in latest|dictsort %}{{ reading(pair[0], MEASUREMENT_LABELS) }}{% endfor %}</ul>
     </div>
-    <div class="d-flex gap-2">
-        <a href="environment/{{ env.id }}/edit" class="btn btn-outline-primary btn-sm" title="Umgebung bearbeiten">Bearbeiten</a>
-        <form method="POST" action="environment/{{ env.id }}/delete" style="display:inline;" id="delete-env-form">
-            <button type="submit" class="btn btn-danger btn-sm" title="Umgebung löschen">Löschen</button>
-        </form>
-    </div>
+    {% endif %}
+    {% if env.notes %}<div><div class="label">Notizen</div><p class="note">{{ env.notes }}</p></div>{% endif %}
+    {% if env.images|length > 1 %}
+    <div class="gallery">{% for img in env.images %}<a href="uploads/{{ img.filename }}" target="_blank"><img src="uploads/{{ img.filename }}" alt="Foto {{ loop.index }}"></a>{% endfor %}</div>
+    {% endif %}
+  </div>
 </div>
-<!-- ...Logbuch und restlicher Inhalt... -->
 
-<h4 class="mt-5 mb-3">Logbuch</h4>
-<div class="mb-3">
-    <a href="environment_log/add?env_id={{ env.id }}" class="btn btn-success btn-sm">+ Neuer Log-Eintrag</a>
-</div>
-<div class="table-responsive">
-{% if entries %}
-<table class="table table-striped align-middle">
-    <thead>
-        <tr>
-            <th>Datum</th>
-            <th>Notizen</th>
-            <th>Messungen</th>
-            <th>Aktionen</th>
-        </tr>
-    </thead>
-    <tbody>
+<section class="section">
+  <div class="section__head">
+    <h2>Pflanzen</h2>
+    <a href="plant/add?env_id={{ env.id }}" class="btn btn--small">{{ icon('plus') }} Pflanze anlegen</a>
+  </div>
+  <div class="bay">
+    {% if plants %}
+    <ul class="plant-list">
+      {% for plant in plants %}
+      {% set thumb = (plant.images|selectattr('id', 'equalto', plant.preview_image_id)|first) or (plant.images|first) %}
+      <li class="plant-row">
+        {% if thumb %}<img class="plant-row__thumb" src="uploads/{{ thumb.filename }}" alt="">{% else %}<span class="plant-row__thumb"></span>{% endif %}
+        <div class="plant-row__name">
+          <a href="plant/{{ plant.id }}">{{ plant.pflanzenname }}</a>
+          <span>{{ plant.strain or 'Unbekannter Strain' }}{% if plant.count and plant.count > 1 %}, {{ plant.count }} Pflanzen{% endif %}</span>
+        </div>
+        <div class="plant-row__status">
+          {{ phase(plant.phase, PHASES) }}
+          <div class="phase__label"><b>{{ plant.phase or 'Phase offen' }}</b></div>
+        </div>
+        <div class="plant-row__day">
+          {% if plant.age_days is not none %}<b>Tag {{ plant.age_days }}</b>{% endif %}
+          <span>seit {{ plant.date.strftime('%d.%m.') if plant.date else '–' }}</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">Noch keine Pflanzen in dieser Umgebung.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section">
+  <div class="section__head">
+    <h2>Klima-Logbuch</h2>
+    <a href="logs/export?env_id={{ env.id }}" class="btn btn--quiet btn--small">{{ icon('report') }} Bericht</a>
+  </div>
+  {% if entries %}
+  <ol class="timeline">
     {% for log in entries %}
-        <tr>
-            <td>{{ log.date.strftime('%d.%m.%Y') }}</td>
-            <td>{{ log.notes|default('-') }}</td>
-            <td>
-                {% if log.measurements|length > 0 %}
-                    <span class="badge bg-info text-dark">{{ log.measurements|length }}</span>
-                    {% set type_icons = {
-                        'luftfeuchtigkeit': '%',
-                        'umgebungstemperatur': '🌡️',
-                        'aussentemperatur': '🌡️',
-                        'lichtabstand': '↕️',
-                        'co2': 'CO₂',
-                        'niederschlaege': '🌧️',
-                        'durchschnittliche_ppfd': '☀️',
-                        'vpd': '💨'
-                    } %}
-                    {% for m in log.measurements %}
-                        <span title="{{ m.type }}">{{ type_icons.get(m.type, '🔬') }}</span>
-                    {% endfor %}
-                {% else %}
-                    <span class="text-muted">-</span>
-                {% endif %}
-            </td>
-            <td>
-                <a href="environment/logs/{{ log.id }}/edit" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
-                <form method="POST" action="environment/logs/{{ log.id }}/delete" style="display:inline;" onsubmit="return confirm('Log-Eintrag wirklich löschen?');">
-                    <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
-                </form>
-            </td>
-        </tr>
+    <li class="entry">
+      <div class="entry__date">{{ log.date|datum }}</div>
+      <div class="entry__kind">{{ icon('sun') }}</div>
+      <div class="entry__body">
+        {% if log.measurements %}<ul class="readings">{% for m in log.measurements %}{{ reading(m, MEASUREMENT_LABELS) }}{% endfor %}</ul>{% else %}<div class="entry__title">Notiz</div>{% endif %}
+        {% if log.notes %}<div class="entry__notes">{{ log.notes }}</div>{% endif %}
+      </div>
+      <div class="entry__tools">
+        <a href="environment/logs/{{ log.id }}/edit" class="btn btn--quiet btn--icon" title="Bearbeiten">{{ icon('edit', 'Bearbeiten') }}</a>
+        <form method="POST" action="environment/logs/{{ log.id }}/delete" class="inline-form" onsubmit="return confirm('Eintrag löschen?');">
+          <button type="submit" class="btn btn--quiet btn--icon btn--danger" title="Löschen">{{ icon('trash', 'Löschen') }}</button>
+        </form>
+      </div>
+    </li>
     {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>Keine Log-Einträge vorhanden.</p>
-{% endif %}
-<div class="mt-5 d-flex align-items-center gap-2">
-    <a href="dashboard" class="btn btn-secondary">Zurück</a>
-    <a href="{{ url_for('export_logs', env_id=env.id)|relative_url }}" class="btn btn-secondary" style="background:#8e44ad; color:white;">
-        <span class="bi bi-download"></span>
-    </a>
-</div>
-<script>
-    document.getElementById('delete-env-form').onsubmit = function(e) {
-        e.preventDefault();
-        const first = confirm('Umgebung wirklich löschen?\n\nAlle zugehörigen Bilder werden entfernt!');
-        if (!first) return; // Abbrechen
-        const second = confirm('Sollen auch alle Pflanzen dieser Umgebung gelöscht werden?\n\nKlicke OK um ALLE Pflanzen zu löschen, Abbrechen um Pflanzen auf Aussenbereich zu verschieben.');
-        if (second) {
-            this.submit();
-        } else {
-            fetch("environment/{{ env.id }}/delete?move_plants=1", {method: 'POST'})
-                .then(() => window.location.href = "dashboard");
-        }
-    };
-</script>
+  </ol>
+  {% else %}
+  <div class="card empty">Noch keine Klimawerte. <a href="environment_log/add?env_id={{ env.id }}">Jetzt erfassen</a></div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <details class="card">
+    <summary style="cursor:pointer;color:var(--danger);font-weight:550">Umgebung löschen</summary>
+    <form method="POST" action="environment/{{ env.id }}/delete" style="margin-top:1rem;display:grid;gap:0.75rem">
+      <p style="color:var(--muted)">Fotos und Klima-Logbuch dieser Umgebung werden gelöscht.{% if plants %} Was soll mit den {{ plants|length }} Pflanzeneinträgen passieren?{% endif %}</p>
+      <div class="btn-row">
+        {% if plants %}
+        <button type="submit" class="btn" formaction="environment/{{ env.id }}/delete?move_plants=1" onclick="return confirm('Umgebung löschen und Pflanzen nach Draußen verschieben?')">Pflanzen nach Draußen verschieben</button>
+        <button type="submit" class="btn btn--danger" onclick="return confirm('Umgebung UND alle Pflanzen samt Einträgen löschen?')">Pflanzen mitlöschen</button>
+        {% else %}
+        <button type="submit" class="btn btn--danger" onclick="return confirm('Umgebung löschen?')">{{ icon('trash') }} Umgebung löschen</button>
+        {% endif %}
+      </div>
+    </form>
+  </details>
+</section>
 {% endblock %}

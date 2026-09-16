@@ -1,0 +1,56 @@
+{% from '_ui.html' import reading %}
+{% set env = report.env %}
+<section>
+  <h2>{{ env.name }}</h2>
+  <ul class="facts" style="margin-top:0.35rem">
+    {% if env.length and env.width %}<li>{{ env.length|num }} × {{ env.width|num }}{% if env.height %} × {{ env.height|num }}{% endif %} cm</li>{% endif %}
+    {% if env.light_enabled %}<li>Licht {{ env.exposure_time }}/{{ 24 - (env.exposure_time or 0) }} h</li>{% endif %}
+    {% if env.lamps %}<li>{% for lamp in env.lamps %}{{ LAMP_LABELS.get(lamp.type, lamp.type) }} {{ lamp.power }} W{% if not loop.last %}, {% endif %}{% endfor %}</li>{% endif %}
+    <li>Bewässerung {{ 'automatisch' if env.auto_watering else 'manuell' }}</li>
+  </ul>
+  {% if env.notes %}<p class="note" style="margin-top:0.6rem">{{ env.notes }}</p>{% endif %}
+</section>
+
+{% if report.env_logs %}
+<section>
+  <h3>Klimawerte</h3>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th style="width:7rem">Datum</th><th>Werte</th><th>Notizen</th></tr></thead>
+    <tbody>
+    {% for log in report.env_logs %}
+      <tr><td>{{ log.date|datum }}</td><td><ul class="readings">{% for m in log.measurements %}{{ reading(m, MEASUREMENT_LABELS) }}{% endfor %}</ul></td><td>{{ log.notes or '' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}
+
+{% for section in report.plants %}
+{% set plant = section.plant %}
+<section style="break-inside:avoid-page">
+  <h3>{{ plant.pflanzenname }}</h3>
+  <ul class="facts">
+    <li>{{ plant.strain or 'Unbekannter Strain' }}</li>
+    <li>{{ plant.count or 1 }} {{ 'Pflanze' if (plant.count or 1) == 1 else 'Pflanzen' }}</li>
+    <li>{{ MEDIA_LABELS.get(plant.medium_type, plant.medium_type or '') }}</li>
+    {% if plant.phase %}<li>{{ plant.phase }}</li>{% endif %}
+    {% if plant.age_days is not none %}<li>Tag {{ plant.age_days }}, seit {{ plant.date|datum }}</li>{% endif %}
+  </ul>
+  {% if section.entries %}
+  <div class="table-wrap" style="margin-top:0.5rem"><table class="table">
+    <thead><tr><th style="width:7rem">Datum</th><th>Eintrag</th><th>Notizen</th></tr></thead>
+    <tbody>
+    {% for entry in section.entries %}
+      <tr>
+        <td>{{ entry.date|datum }}</td>
+        <td>{% if entry.type == 'action' %}{{ ACTION_LABELS.get(entry.obj.action, entry.obj.action) }}{% else %}<ul class="readings">{% for m in entry.obj.measurements %}{{ reading(m, MEASUREMENT_LABELS) }}{% endfor %}</ul>{% endif %}</td>
+        <td>{{ entry.obj.notes or '' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <p style="color:var(--muted);margin-top:0.4rem">Keine Einträge.</p>
+  {% endif %}
+</section>
+{% endfor %}

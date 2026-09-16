@@ -1,45 +1,34 @@
 {% extends 'base.html' %}
-{% block title %}Pflanzenaktionen{% endblock %}
+{% from '_ui.html' import icon %}
+{% block title %}Aktionen – CannaLog{% endblock %}
 {% block content %}
-<div class="d-flex align-items-center justify-content-center mb-4" style="gap:1rem;">
-    <a href="dashboard">
-        <img src="static/assets/logo_small.png" alt="Logo" style="height:60px; width:auto; display:block; cursor:pointer;">
-    </a>
-    <h1 class="mb-0 fw-bold" style="font-size:2.2rem; line-height:60px;">Pflanzenaktionen</h1>
-</div>
-<!-- entfernt: nicht mehr genutzt -->
-<div class="mb-3">
-    <a href="plant_actions/add" class="btn btn-success btn-sm">+ Neue Aktion</a>
+<div class="page-head">
+  <div class="page-head__title">
+    <h1>Aktionen</h1>
+    <p>Alle Pflegeschritte über alle Pflanzen, neueste zuerst.</p>
+  </div>
+  <a href="plant_actions/add" class="btn btn--primary">{{ icon('drop') }} Aktion eintragen</a>
 </div>
 {% if logs %}
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Datum</th>
-            <th>Pflanze</th>
-            <th>Aktion</th>
-            <th>Notizen</th>
-            <th>Aktionen</th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for log in logs %}
-        <tr>
-            <td>{{ log.date.strftime('%d.%m.%Y') }}</td>
-            <td>{{ log.plant.pflanzenname }}</td>
-            <td>{{ log.action|capitalize }}</td>
-            <td>{{ log.notes|default('-') }}</td>
-            <td>
-                <a href="plant_actions/{{ log.id }}/edit" class="btn btn-sm btn-primary">Bearbeiten</a>
-                <form method="POST" action="plant_actions/{{ log.id }}/delete" style="display:inline;" onsubmit="return confirm('Aktion wirklich löschen?');">
-                    <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
-                </form>
-            </td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
+<ol class="timeline">
+  {% for log in logs %}
+  <li class="entry">
+    <div class="entry__date">{{ log.date|datum }}</div>
+    <div class="entry__kind entry__kind--action">{{ icon('drop') }}</div>
+    <div class="entry__body">
+      <div class="entry__title">{{ ACTION_LABELS.get(log.action, log.action) }} <span style="font-weight:400;color:var(--muted)">bei</span> <a href="plant/{{ log.plant.id }}">{{ log.plant.pflanzenname }}</a></div>
+      {% if log.notes %}<div class="entry__notes">{{ log.notes }}</div>{% endif %}
+    </div>
+    <div class="entry__tools">
+      <a href="plant_actions/{{ log.id }}/edit" class="btn btn--quiet btn--icon" title="Bearbeiten">{{ icon('edit', 'Bearbeiten') }}</a>
+      <form method="POST" action="plant_actions/{{ log.id }}/delete" class="inline-form" onsubmit="return confirm('Aktion löschen?');">
+        <button type="submit" class="btn btn--quiet btn--icon btn--danger" title="Löschen">{{ icon('trash', 'Löschen') }}</button>
+      </form>
+    </div>
+  </li>
+  {% endfor %}
+</ol>
 {% else %}
-<p>Keine Aktionen vorhanden.</p>
+<div class="card empty">Noch keine Aktionen. <a href="plant_actions/add">Erste Aktion eintragen</a></div>
 {% endif %}
 {% endblock %}

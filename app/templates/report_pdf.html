@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>CannaLog Bericht {{ report.env.name }}</title>
+<style>{{ css|safe }}
+body { background: #fff; }
+.report section { margin-top: 1.1em; }
+.report__head { display: block; overflow: hidden; }
+.report__head img { float: right; height: 40px; }
+.readings { display: block; }
+.reading { display: inline-block; white-space: nowrap; padding: 0 0.45em; margin: 0 0.25em 0.2em 0; }
+.reading b { margin-left: 0.35em; }
+.facts li { display: inline; margin-right: 1em; }
+.table-wrap { border-radius: 0; overflow: visible; }
+.table th, .table td { padding: 0.35em 0.5em; }
+</style>
+</head>
+<body class="report">
+  <header class="report__head">
+    <img src="{{ logo }}" alt="CannaLog">
+    <div>
+      <h1>Grow-Bericht</h1>
+      <div style="color:var(--muted)">Erstellt am {{ report.generated_at }}</div>
+    </div>
+  </header>
+  {% include '_report.html' %}
+</body>
+</html>

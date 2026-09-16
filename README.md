@@ -1,51 +1,41 @@
-![Logo](app/static/assets/logo.png)
+<p align="center"><img src="app/static/assets/logo.png" alt="CannaLog" width="420"></p>
 
-# Cannalog
+# CannaLog
 
-CannaLog ist eine moderne, private Web-App zur Verwaltung von Pflanzen, Umgebungen, Messwerten, Aktionen und Bildern – optimiert für Desktop und Smartphone. Die Anwendung basiert auf Flask, SQLAlchemy und Bootstrap und bietet ein intuitives, responsives Dashboard für Grow- und Pflanzenprojekte.
+CannaLog ist ein privates Grow-Tagebuch für Pflanzen, Zelte und Außenbereiche. Du hältst fest,
+was du gießt, düngst und misst, siehst auf einen Blick, in welcher Phase jede Pflanze steht,
+und stellst die Einträge als Bericht oder PDF zusammen. Die App läuft eigenständig per Docker
+oder als App in Home Assistant und ist fürs Handy im Zelt genauso gebaut wie für den Desktop.
 
-## Features
-- Pflanzen- und Umgebungsverwaltung mit Bildern und Notizen
-- Logbuch für Messwerte (z.B. Temperatur, Feuchtigkeit, pH, EC, Licht, etc.)
-- Aktionen-Log für Pflanzen (z.B. Gießen, Düngen, Umtopfen)
-- Bild-Upload für Pflanzen und Umgebungen
-- Auswahl von Vorschaubildern
-- Responsive UI für Desktop und Mobile
-- Zwei-Schritt-Bestätigung beim Löschen von Umgebungen mit Pflanzen
-- Übersichtliche Dashboards und Detailansichten
+![Übersicht](assets/screenshot_dashboard.png)
+
+## Funktionen
+
+- **Übersicht nach Umgebung:** jede Pflanze mit Phasenleiste, Tag seit dem Start und letzter Aktion,
+  jedes Zelt mit Maßen, Lichtzyklus, Lampenleistung und dem letzten Klima
+- **Aktionen:** Gießen, Düngen, Training, Umtopfen, Ernte und mehr, mit Notizen
+- **Messungen:** pH, EC, TDS, Höhe, Wassertemperatur und PPFD pro Pflanze, Temperatur, Luftfeuchte,
+  VPD, CO₂ und Lichtabstand pro Umgebung, jeweils als Einzelwert oder Bereich
+- **Fotos:** mehrere pro Pflanze oder Umgebung, eines davon als Vorschaubild
+- **Bericht:** Klima, Messungen und Aktionen einer Umgebung am Bildschirm oder als PDF
+- **Schnellerfassung am Handy:** feste Leiste für Aktion, Messung und Foto
+- **Mehrere Konten**, Registrierung abschaltbar
 
 ## Screenshots
 
-### Hauptansicht
-![Hauptansicht](assets/screenshot_main.jpg)
+| Pflanze | Umgebung |
+| --- | --- |
+| ![Pflanze](assets/screenshot_plant_overview.png) | ![Umgebung](assets/screenshot_env_overview.png) |
+| **Messung erfassen** | **Bericht** |
+| ![Messung](assets/screenshot_plant_log.png) | ![Bericht](assets/screenshot_report.png) |
 
-### Login
-![Login](assets/screenshot_login.jpg)
+Am Handy:
 
-### Dashboard
-![Dashboard](assets/screenshot_dashboard.jpg)
-
-### Umgebungsübersicht
-![Umgebungsübersicht](assets/screenshot_env_overview.jpg)
-
-### Umgebungen editieren/hinzufügen
-![Pflanzen-Edit](assets/screenshot_env_edit.jpg)
-
-### Umgebungs-Logbuch
-![Umgebungs-Logbuch](assets/screenshot_env_log.jpg)
-
-### Pflanzenübersicht
-![Pflanzenübersicht](assets/screenshot_plant_overview.jpg)
-
-### Pflanzen-Logbuch
-![Pflanzen-Logbuch](assets/screenshot_plant_log.jpg)
-
-### Pflanzen-Aktion
-![Pflanzen-Aktion](assets/screenshot_plant_action.jpg)
-
-### Pflanzen editieren/hinzufügen
-![Pflanzen-Edit](assets/screenshot_plant_edit.jpg)
-
+<p>
+  <img src="assets/screenshot_mobile_dashboard.png" alt="Übersicht am Handy" width="250">
+  <img src="assets/screenshot_mobile_plant.png" alt="Pflanze am Handy" width="250">
+  <img src="assets/screenshot_mobile_action.png" alt="Aktion eintragen am Handy" width="250">
+</p>
 
 ## Installation
 
@@ -89,8 +79,5 @@ Ein Tag `vX.Y.Z` baut per GitHub Actions `ghcr.io/ninharp/cannalog` (Standalone)
 HA-Repository `version` in `cannalog/config.yaml` anheben.
 
 ## Lizenz
+
 MIT License
-
----
-
-Viel Spaß beim Dokumentieren und Verwalten deiner Pflanzen!

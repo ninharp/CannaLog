@@ -1,11 +1,14 @@
 {% extends 'base.html' %}
-{% block title %}Willkommen bei Cannalog{% endblock %}
-{% block content %}
-<div class="text-center mt-5">
-	<h1>Willkommen bei Cannalog</h1>
-	<div class="mt-4">
-	<a href="login" class="btn btn-primary me-2">Login</a>
-	{% if ALLOW_REGISTRATION %}<a href="register" class="btn btn-secondary">Registrieren</a>{% endif %}
-	</div>
-</div>
+{% block title %}CannaLog{% endblock %}
+{% block body %}
+<main class="auth">
+  <div class="auth__panel">
+    <img class="auth__logo" src="static/assets/logo.png" alt="CannaLog">
+    <p style="text-align:center;color:var(--muted)">Dein Grow-Tagebuch für Pflanzen, Zelte, Messwerte und Fotos.</p>
+    <div class="btn-row" style="justify-content:center">
+      <a href="login" class="btn btn--primary">Anmelden</a>
+      {% if ALLOW_REGISTRATION %}<a href="register" class="btn">Konto erstellen</a>{% endif %}
+    </div>
+  </div>
+</main>
 {% endblock %}

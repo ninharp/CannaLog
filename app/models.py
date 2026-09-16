@@ -1,6 +1,6 @@
 from app import db
 from flask_login import UserMixin
-from datetime import datetime
+from datetime import date, datetime
 
 class PlantActionLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -83,3 +83,28 @@ class Plant(db.Model):
     preview_image_id = db.Column(db.Integer, db.ForeignKey('plant_image.id', use_alter=True, name='fk_plant_preview_image'), nullable=True)
     actions = db.relationship('PlantActionLog', back_populates='plant', cascade='all, delete-orphan')
     logs = db.relationship('PlantLog', backref='plant', cascade='all, delete-orphan')
+
+
+def _latest_measurements(logs):
+    """Newest value per measurement type across the given logs, as {type: (measurement, date)}."""
+    latest = {}
+    for log in sorted(logs, key=lambda entry: entry.date, reverse=True):
+        for m in log.measurements:
+            latest.setdefault(m.type, (m, log.date))
+    return latest
+
+
+def _age_days(self):
+    if not self.date:
+        return None
+    return (date.today() - self.date).days
+
+
+def _last_action(self):
+    return max(self.actions, key=lambda action: action.date, default=None)
+
+
+Plant.age_days = property(_age_days)
+Plant.last_action = property(_last_action)
+Plant.latest_measurements = property(lambda self: _latest_measurements(self.logs))
+Environment.latest_measurements = property(lambda self: _latest_measurements(self.logs))

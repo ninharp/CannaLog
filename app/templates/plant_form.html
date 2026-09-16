@@ -1,112 +1,56 @@
 {% extends 'base.html' %}
-{% block title %}Pflanze speichern - Cannalog{% endblock %}
+{% from '_ui.html' import icon, field, form_errors, image_picker %}
+{% block title %}{{ 'Pflanze bearbeiten' if plant else 'Pflanze anlegen' }} – CannaLog{% endblock %}
+{% block page_class %}page--narrow{% endblock %}
 {% block content %}
-<div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
-    <div class="d-flex align-items-center mb-3" style="gap:1rem;">
-        <img src="static/assets/logo_small.png" alt="Logo" style="height:38px; width:auto; display:block;">
-        <h2 class="mb-0">{% if plant %}Pflanze bearbeiten{% else %}Pflanze hinzufügen{% endif %}</h2>
-    </div>
-    <form method="POST" enctype="multipart/form-data">
-    {{ form.hidden_tag() }}
-    <div class="mb-3">{{ form.pflanzenname.label }} {{ form.pflanzenname(class_="form-control") }}</div>
-    <div class="mb-3">{{ form.date.label }} {{ form.date(class_="form-control") }}</div>
-    <div class="mb-3">{{ form.count.label }} {{ form.count(class_="form-control") }}</div>
-    <div class="mb-3">{{ form.medium_type.label }} {{ form.medium_type(class_="form-select") }}</div>
-    <div class="mb-3">{{ form.medium_notes.label }} {{ form.medium_notes(class_="form-control") }}</div>
-    <div class="mb-3">{{ form.strain.label }} {{ form.strain(class_="form-control", value=form.strain.data if form.strain.data else '') }}</div>
-    <div class="mb-3">{{ form.phase.label }} {{ form.phase(class_="form-select") }}</div>
-    <div class="mb-3">{{ form.notes.label }} {{ form.notes(class_="form-control") }}</div>
-    <div class="mb-3">
-        {{ form.images.label }}
-        <div id="image-fields">
-            <div class="input-group mb-1">
-                <input type="file" name="images" class="form-control" accept="image/*">
-                <button type="button" class="btn btn-outline-danger" onclick="removeImageField(this)">Entfernen</button>
-            </div>
-        </div>
-        <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="addImageField()">Weiteres Bild hinzufügen</button>
-    </div>
-    <script>
-    function addImageField() {
-        const container = document.getElementById('image-fields');
-        const group = document.createElement('div');
-        group.className = 'input-group mb-1';
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.name = 'images';
-        input.className = 'form-control';
-        input.accept = 'image/*';
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn btn-outline-danger';
-        btn.textContent = 'Entfernen';
-        btn.onclick = function() { removeImageField(btn); };
-        group.appendChild(input);
-        group.appendChild(btn);
-        container.appendChild(group);
-    }
-    function removeImageField(btn) {
-        btn.parentElement.remove();
-    }
-    </script>
-    <div class="mb-3">{{ form.environment_id.label }} {{ form.environment_id(class_="form-select") }}</div>
-    <input type="hidden" id="preview_image_id" name="preview_image_id" value="{{ plant.preview_image_id if plant is defined and plant.preview_image_id else -1 }}">
-    {% if plant and plant.images %}
-    <div class="mt-2">
-        <strong>Vorhandene Bilder (Klick für Vorschaubild):</strong><br>
-        <div id="plant-image-list">
-        {% for img in plant.images %}
-            <div class="d-inline-block text-center me-2 mb-2">
-                <div style="position:relative;">
-                    {% set img_style = 'border-radius:6px; display:block; cursor:pointer;' + (' border:3px solid #198754;' if plant.preview_image_id == img.id else ' border:1px solid #ccc;') %}
-                    <img src="uploads/{{ img.filename }}" alt="Bild" width="80" style="{{ img_style }}" onclick="selectPreviewImage({{ img.id }}, this)">
-                    {% if plant.preview_image_id == img.id %}
-                        <span class="preview-star" style="position:absolute;top:2px;right:2px;background:#198754;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:1.1em;z-index:2;" title="Vorschaubild">★</span>
-                    {% endif %}
-                </div>
-                <div style="font-size:0.9em; color:#888;">Bild {{ loop.index }}</div>
-                <button type="button" class="btn btn-outline-danger btn-sm mt-1" onclick="deletePlantImage('{{ img.id }}')">Entfernen</button>
-            </div>
-        {% endfor %}
-        </div>
-    </div>
-    <script>
-    function selectPreviewImage(imgId, el) {
-        document.getElementById('preview_image_id').value = imgId;
-        // Rahmen und Stern aktualisieren
-        document.querySelectorAll('#plant-image-list img').forEach(img => {
-            img.style.border = '';
-        });
-        el.style.border = '3px solid #198754';
-        document.querySelectorAll('#plant-image-list .preview-star').forEach(star => star.remove());
-        // Stern hinzufügen
-        const star = document.createElement('span');
-        star.className = 'preview-star';
-        star.style = 'position:absolute;top:2px;right:2px;background:#198754;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:1.1em;z-index:2;';
-        star.title = 'Vorschaubild';
-        star.innerText = '★';
-        el.parentElement.appendChild(star);
-    }
-    function deletePlantImage(imgId) {
-        document.getElementById('delete_image_id').value = imgId;
-        document.querySelector('form[method=POST]').submit();
-    }
-    </script>
-    {% endif %}
-    <input type="hidden" id="delete_image_id" name="delete_image_id" value="">
-    <div class="d-flex justify-content-between mt-4">
-        <a href="dashboard" class="btn btn-secondary">Zurück</a>
-        <button type="submit" class="btn btn-success">Speichern</button>
-    </div>
-    </form>
+<div class="page-head">
+  <div class="page-head__title">
+    <a class="back" href="{{ 'plant/' ~ plant.id if plant else 'dashboard' }}">{{ icon('back') }} {{ plant.pflanzenname if plant else 'Übersicht' }}</a>
+    <h1>{{ 'Pflanze bearbeiten' if plant else 'Pflanze anlegen' }}</h1>
+  </div>
 </div>
-<script>
-function removeDeleteImageFields() {
-    document.getElementById('delete_image_id').value = '';
-}
-function deletePlantImage(imgId) {
-    document.getElementById('delete_image_id').value = imgId;
-    document.querySelector('form[method=POST]').submit();
-}
-</script>
+{{ form_errors(form) }}
+<form method="POST" enctype="multipart/form-data">
+  {{ form.hidden_tag() }}
+  <section class="card form">
+    <h2 class="card__title" style="font-size:var(--step-1);margin:0">Pflanze</h2>
+    {{ field(form.pflanzenname, placeholder="z. B. Northern Lights #1") }}
+    <div class="grid-2">
+      {{ field(form.strain) }}
+      {{ field(form.count, min=1, inputmode="numeric") }}
+    </div>
+    <div class="grid-2">
+      {{ field(form.phase) }}
+      {{ field(form.date, hint="Keimung oder Einpflanzen, daraus wird der Tag gezählt") }}
+    </div>
+    {{ field(form.environment_id) }}
+  </section>
+  <section class="card form">
+    <h2 style="font-size:var(--step-1)">Medium</h2>
+    {{ field(form.medium_type) }}
+    {{ field(form.medium_notes, rows=2, placeholder="Erde, Topfgröße, Dünger …") }}
+  </section>
+  <section class="card form">
+    <h2 style="font-size:var(--step-1)">Notizen und Fotos</h2>
+    {{ field(form.notes, rows=3) }}
+    <div class="field">
+      <label for="images">Fotos hinzufügen</label>
+      <input type="file" id="images" name="images" accept="image/*" multiple>
+    </div>
+    {% if plant and plant.images %}
+    <div class="field">
+      <span class="label">Vorhandene Fotos</span>
+      <span class="field__hint">Tippe ein Foto an, um es als Vorschaubild zu verwenden.</span>
+      {{ image_picker(plant.images|sort(attribute='id'), plant.preview_image_id, 'Foto löschen') }}
+    </div>
+    {% else %}
+    <input type="hidden" id="preview_image_id" name="preview_image_id" value="-1">
+    <input type="hidden" id="delete_image_id" name="delete_image_id" value="">
+    {% endif %}
+  </section>
+  <div class="form-actions">
+    <a href="{{ 'plant/' ~ plant.id if plant else 'dashboard' }}" class="btn btn--quiet">Abbrechen</a>
+    <div class="form-actions__main"><button type="submit" class="btn btn--primary">{{ 'Speichern' if plant else 'Pflanze anlegen' }}</button></div>
+  </div>
+</form>
 {% endblock %}

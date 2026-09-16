@@ -1,139 +1,107 @@
 {% extends 'base.html' %}
-{% block title %}Pflanze: {{ plant.pflanzenname }} - Cannalog{% endblock %}
+{% from '_ui.html' import icon, phase, reading %}
+{% block title %}{{ plant.pflanzenname }} – CannaLog{% endblock %}
 {% block content %}
+{% set preview = (plant.images|selectattr('id', 'equalto', plant.preview_image_id)|first) or (plant.images|first) %}
 
-<div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
-    <div class="d-flex align-items-center mb-4" style="gap:1rem;">
-        <a href="dashboard">
-            <img src="static/assets/logo_small.png" alt="Logo" style="height:60px; width:auto; display:block; cursor:pointer;">
-        </a>
-        <h1 class="mb-0 fw-bold" style="font-size:2.5rem; line-height:60px;">{{ plant.pflanzenname }}</h1>
-    </div>
-
-{% set preview_img = None %}
-{% if plant.preview_image_id %}
-    {% for img in plant.images %}
-        {% if img.id == plant.preview_image_id %}{% set preview_img = img %}{% endif %}
-    {% endfor %}
-{% endif %}
-{% if not preview_img and plant.images and plant.images|length > 0 %}
-    {% set preview_img = plant.images[0] %}
-{% endif %}
-{% if preview_img %}
-    <div class="mb-3">
-        <img src="uploads/{{ preview_img.filename }}" alt="Vorschaubild" width="180" style="border-radius:8px;">
-    </div>
-{% endif %}
-
-<div class="mb-4">
-    <div class="d-flex flex-wrap gap-3">
-        <span class="badge bg-light text-dark border"><strong>Anzahl:</strong> {{ plant.count }}</span>
-        <span class="badge bg-light text-dark border"><strong>Medium:</strong> {{ plant.medium_type }}</span>
-        <span class="badge bg-light text-dark border"><strong>Phase:</strong> {{ plant.phase }}</span>
-        <span class="badge bg-light text-dark border"><strong>Strain:</strong> {{ plant.strain }}</span>
-        <span class="badge bg-light text-dark border"><strong>Datum:</strong> {{ plant.date.strftime('%d.%m.%Y') if plant.date else '-' }}</span>
-    <span class="badge bg-light text-dark border"><strong>Umgebung:</strong> {{ plant.environment.name if plant.environment else 'Aussenbereich' }}</span>
-    </div>
+<div class="page-head">
+  <div class="page-head__title">
+    <a class="back" href="{{ 'environment/' ~ plant.environment.id if plant.environment else 'dashboard' }}">{{ icon('back') }} {{ plant.environment.name if plant.environment else 'Übersicht' }}</a>
+    <h1>{{ plant.pflanzenname }}</h1>
+    <p>{{ plant.strain or 'Unbekannter Strain' }}</p>
+  </div>
+  <div class="btn-row">
+    <a href="plant/{{ plant.id }}/edit" class="btn">{{ icon('edit') }} Bearbeiten</a>
+    <a href="plant_actions/add?plant_id={{ plant.id }}" class="btn">{{ icon('drop') }} Aktion</a>
+    <a href="plant/{{ plant.id }}/logs/add" class="btn btn--primary">{{ icon('gauge') }} Messung</a>
+  </div>
 </div>
-{% if plant.notes %}
-<div class="mb-4">
-    <div style="background:#f3f3f3; color:#444; border-radius:5px; padding:0.5em 1em; max-width:600px; text-align:left; font-size:0.98em; border:1px solid #e0e0e0;">
-        <span style="font-weight:600; color:#888;">Notizen:</span><br>
-        <span style="display:block; margin-top:0.3em;">{{ plant.notes }}</span>
+
+<div class="profile">
+  {% if preview %}
+    <img class="profile__photo" src="uploads/{{ preview.filename }}" alt="Foto von {{ plant.pflanzenname }}">
+  {% else %}
+    <a class="profile__photo profile__photo--empty" href="image/add" title="Foto hochladen">{{ icon('camera', 'Foto hochladen') }}</a>
+  {% endif %}
+  <div class="profile__body">
+    <div class="profile__day">
+      {% if plant.age_days is not none %}<b>Tag {{ plant.age_days }}</b>seit {{ plant.date|datum }}{% else %}Startdatum nicht gesetzt{% endif %}
     </div>
-</div>
-{% endif %}
-<div class="d-flex align-items-center gap-2 mb-4 justify-content-between">
+    {{ phase(plant.phase, PHASES, large=True) }}
+    <dl class="stats">
+      <div class="stat"><dt>Anzahl</dt><dd>{{ plant.count or 1 }}</dd></div>
+      <div class="stat"><dt>Medium</dt><dd>{{ MEDIA_LABELS.get(plant.medium_type, plant.medium_type or '–') }}</dd></div>
+      <div class="stat"><dt>Umgebung</dt><dd>{{ plant.environment.name if plant.environment else 'Draußen' }}</dd></div>
+      {% set last = plant.last_action %}
+      <div class="stat"><dt>Letzte Aktion</dt><dd>{% if last %}{{ ACTION_LABELS.get(last.action, last.action) }}<small>{{ last.date|datum }}</small>{% else %}–{% endif %}</dd></div>
+    </dl>
+    {% set latest = plant.latest_measurements %}
+    {% if latest %}
     <div>
-    <a href="plant/{{ plant.id }}/edit" class="btn btn-outline-primary btn-sm" title="Bearbeiten">Bearbeiten</a>
+      <div class="label" style="margin-bottom:0.4rem">Letzte Messwerte</div>
+      <ul class="readings">{% for key, pair in latest|dictsort %}{{ reading(pair[0], MEASUREMENT_LABELS) }}{% endfor %}</ul>
     </div>
-    <form method="POST" action="plant/{{ plant.id }}/delete" style="display:inline;" onsubmit="return confirm('Pflanze wirklich löschen? Alle zugehörigen Bilder werden entfernt!');">
-    <button type="submit" class="btn btn-outline-danger btn-sm" title="Löschen">Löschen</button>
-    </form>
-</div>
-<!-- ...Logbuch und restlicher Inhalt... -->
-
-
-<h4 class="mt-5 mb-3">Logbuch</h4>
-<div class="mb-3 d-flex gap-2">
-    <a href="plant/{{ plant.id }}/logs/add" class="btn btn-success btn-sm">+ Neuer Log-Eintrag</a>
-    <a href="plant_actions/add?plant_id={{ plant.id }}" class="btn btn-info btn-sm">+ Neue Aktion</a>
-</div>
-<div class="table-responsive">
-{% if entries %}
-<table class="table table-striped align-middle">
-    <thead>
-        <tr>
-            <th>Datum</th>
-            <th>Notizen</th>
-            <th>Messungen / Aktion</th>
-            <th>Aktionen</th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for entry in entries %}
-        <tr>
-            <td>{{ entry.date.strftime('%d.%m.%Y') }}</td>
-            <td>
-                {% if entry.type == 'log' %}
-                    {{ entry.obj.notes|default('-') }}
-                {% elif entry.type == 'action' %}
-                    {{ entry.obj.notes|default('-') }}
-                {% endif %}
-            </td>
-            <td>
-                {% if entry.type == 'log' %}
-                    {% if entry.obj.measurements|length > 0 %}
-                        <span class="badge bg-info text-dark">{{ entry.obj.measurements|length }}</span>
-                        {% set type_icons = {
-                            'hoehe': '↕️',
-                            'tds': 'TDS',
-                            'ph': 'pH',
-                            'ec': '⚡',
-                            'wassertemperatur': '🌡️',
-                            'ppfd': '☀️'
-                        } %}
-                        {% for m in entry.obj.measurements %}
-                            <span title="{{ m.type }}">{{ type_icons.get(m.type, '🔬') }}</span>
-                        {% endfor %}
-                    {% else %}
-                        <span class="text-muted">-</span>
-                    {% endif %}
-                {% elif entry.type == 'action' %}
-                    <span class="badge bg-warning text-dark">A</span> {{ entry.obj.action|capitalize }}
-                {% endif %}
-            </td>
-            <td>
-                {% if entry.type == 'log' %}
-                    <a href="plant/logs/{{ entry.obj.id }}/edit" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
-                    <form method="POST" action="plant/logs/{{ entry.obj.id }}/delete" style="display:inline;" onsubmit="return confirm('Log-Eintrag wirklich löschen?');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
-                    </form>
-                {% elif entry.type == 'action' %}
-                    <a href="plant_actions/{{ entry.obj.id }}/edit" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
-                    <form method="POST" action="plant_actions/{{ entry.obj.id }}/delete" style="display:inline;" onsubmit="return confirm('Aktion wirklich löschen?');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
-                    </form>
-                {% endif %}
-            </td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>Keine Log-Einträge vorhanden.</p>
-{% endif %}
-
-<div class="mt-5 d-flex align-items-center gap-2">
-    <a href="dashboard" class="btn btn-secondary">Zurück</a>
-    {% if plant.environment %}
-    <a href="{{ url_for('export_logs', env_id=plant.environment.id)|relative_url }}" class="btn btn-secondary" style="background:#8e44ad; color:white;">
-        <span class="bi bi-download"></span>
-    </a>
-    {% else %}
-    <a href="{{ url_for('export_logs')|relative_url }}" class="btn" style="background:#8e44ad; color:white; border-radius:2rem; padding:0.5em 1.5em; font-size:1rem; box-shadow:0 2px 8px #0001;">
-        <span class="bi bi-download"></span>
-    </a>
     {% endif %}
+    {% if plant.medium_notes %}<div><div class="label">Medium</div><p class="note">{{ plant.medium_notes }}</p></div>{% endif %}
+    {% if plant.notes %}<div><div class="label">Notizen</div><p class="note">{{ plant.notes }}</p></div>{% endif %}
+    {% if plant.images|length > 1 %}
+    <div class="gallery">{% for img in plant.images %}<a href="uploads/{{ img.filename }}" target="_blank"><img src="uploads/{{ img.filename }}" alt="Foto {{ loop.index }}"></a>{% endfor %}</div>
+    {% endif %}
+  </div>
 </div>
+
+<section class="section">
+  <div class="section__head">
+    <h2>Logbuch</h2>
+    <div class="btn-row">
+      {% if plant.environment %}<a href="logs/export?env_id={{ plant.environment.id }}" class="btn btn--quiet btn--small">{{ icon('report') }} Bericht</a>{% endif %}
+    </div>
+  </div>
+  {% if entries %}
+  <ol class="timeline">
+    {% for entry in entries %}
+    <li class="entry">
+      <div class="entry__date">{{ entry.date|datum }}</div>
+      {% if entry.type == 'action' %}
+        <div class="entry__kind entry__kind--action">{{ icon('drop') }}</div>
+        <div class="entry__body">
+          <div class="entry__title">{{ ACTION_LABELS.get(entry.obj.action, entry.obj.action) }}</div>
+          {% if entry.obj.notes %}<div class="entry__notes">{{ entry.obj.notes }}</div>{% endif %}
+        </div>
+        <div class="entry__tools">
+          <a href="plant_actions/{{ entry.obj.id }}/edit" class="btn btn--quiet btn--icon" title="Bearbeiten">{{ icon('edit', 'Bearbeiten') }}</a>
+          <form method="POST" action="plant_actions/{{ entry.obj.id }}/delete" class="inline-form" onsubmit="return confirm('Aktion löschen?');">
+            <button type="submit" class="btn btn--quiet btn--icon btn--danger" title="Löschen">{{ icon('trash', 'Löschen') }}</button>
+          </form>
+        </div>
+      {% else %}
+        <div class="entry__kind">{{ icon('gauge') }}</div>
+        <div class="entry__body">
+          {% if entry.obj.measurements %}
+            <ul class="readings">{% for m in entry.obj.measurements %}{{ reading(m, MEASUREMENT_LABELS) }}{% endfor %}</ul>
+          {% else %}
+            <div class="entry__title">Notiz</div>
+          {% endif %}
+          {% if entry.obj.notes %}<div class="entry__notes">{{ entry.obj.notes }}</div>{% endif %}
+        </div>
+        <div class="entry__tools">
+          <a href="plant/logs/{{ entry.obj.id }}/edit" class="btn btn--quiet btn--icon" title="Bearbeiten">{{ icon('edit', 'Bearbeiten') }}</a>
+          <form method="POST" action="plant/logs/{{ entry.obj.id }}/delete" class="inline-form" onsubmit="return confirm('Messung löschen?');">
+            <button type="submit" class="btn btn--quiet btn--icon btn--danger" title="Löschen">{{ icon('trash', 'Löschen') }}</button>
+          </form>
+        </div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <div class="card empty">Noch keine Einträge. Trag die erste <a href="plant_actions/add?plant_id={{ plant.id }}">Aktion</a> oder <a href="plant/{{ plant.id }}/logs/add">Messung</a> ein.</div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <form method="POST" action="plant/{{ plant.id }}/delete" onsubmit="return confirm('Pflanze mit allen Einträgen und Fotos löschen?');">
+    <button type="submit" class="btn btn--quiet btn--danger btn--small">{{ icon('trash') }} Pflanze löschen</button>
+  </form>
+</section>
 {% endblock %}

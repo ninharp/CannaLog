@@ -1,153 +1,110 @@
 {% extends 'base.html' %}
-{% block title %}Dashboard - Cannalog{% endblock %}
+{% from '_ui.html' import icon, phase, reading %}
+{% block title %}Übersicht – CannaLog{% endblock %}
+
+{% macro plant_row(plant) %}
+<li class="plant-row">
+  {% if plant.preview_img %}
+    <img class="plant-row__thumb" src="uploads/{{ plant.preview_img.filename }}" alt="">
+  {% else %}
+    <span class="plant-row__thumb"></span>
+  {% endif %}
+  <div class="plant-row__name">
+    <a href="plant/{{ plant.id }}">{{ plant.pflanzenname }}</a>
+    <span>{{ plant.strain or 'Unbekannter Strain' }}{% if plant.count and plant.count > 1 %}, {{ plant.count }} Pflanzen{% endif %}</span>
+  </div>
+  <div class="plant-row__status">
+    {{ phase(plant.phase, PHASES) }}
+    <div class="phase__label">
+      <b>{{ plant.phase or 'Phase offen' }}</b>
+      {% set last = plant.last_action %}
+      {% if last %}<span>{{ ACTION_LABELS.get(last.action, last.action) }} am {{ last.date.strftime('%d.%m.') }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="plant-row__day">
+    {% if plant.age_days is not none %}<b>Tag {{ plant.age_days }}</b>{% endif %}
+    <span>seit {{ plant.date.strftime('%d.%m.') if plant.date else '–' }}</span>
+  </div>
+</li>
+{% endmacro %}
+
 {% block content %}
-
-
-<div class="mb-2 d-flex justify-content-center align-items-center" style="height:100px;">
-    <img src="{{ url_for('static', filename='assets/logo_small.png')|relative_url }}" alt="Logo" class="logo-small" style="height:100px; width:auto; display:inline-block; vertical-align:middle;">
-    <h1 class="mb-0 d-inline-block align-middle" style="line-height:100px; vertical-align:middle; margin-left:1rem; margin-right:1.5rem;">Dashboard</h1>
+<div class="page-head">
+  <div class="page-head__title">
+    <h1>Übersicht</h1>
+    <p>{{ environments|length }} {{ 'Umgebung' if environments|length == 1 else 'Umgebungen' }}, {{ plants|length }} {{ 'Pflanzeneintrag' if plants|length == 1 else 'Pflanzeneinträge' }}</p>
+  </div>
+  <div class="btn-row">
+    <a href="environment/add" class="btn">{{ icon('tent') }} Neue Umgebung</a>
+    <a href="plant/add" class="btn btn--primary">{{ icon('plus') }} Neue Pflanze</a>
+  </div>
 </div>
 
-<!-- Schnellaktions-Buttons + Export-Button -->
-<div class="d-flex justify-content-center gap-3 mb-4 align-items-center">
-    <!-- Schnellaktions-Buttons -->
-    {% if plants %}
-        <a href="{{ url_for('add_plant_action_log')|relative_url }}" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width:60px; height:60px; font-size:1.7rem;">
-            <span>⚡</span>
-        </a>
-    {% else %}
-        <span class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center disabled" style="width:60px; height:60px; font-size:1.7rem; opacity:0.5;">
-            <span>⚡</span>
-        </span>
-    {% endif %}
-    {% if plants or environments %}
-        <a href="{{ url_for('add_image_global')|relative_url }}" class="btn btn-info rounded-circle d-flex align-items-center justify-content-center" style="width:60px; height:60px; font-size:1.7rem;">
-            <span>🖼️</span>
-        </a>
-    {% else %}
-        <span class="btn btn-info rounded-circle d-flex align-items-center justify-content-center disabled" style="width:60px; height:60px; font-size:1.7rem; opacity:0.5;">
-            <span>🖼️</span>
-        </span>
-    {% endif %}
-    {% if plants %}
-        <a href="{{ url_for('add_plant_log_global')|relative_url }}" class="btn btn-success rounded-circle d-flex align-items-center justify-content-center" style="width:60px; height:60px; font-size:1.7rem;">
-            <span class="bi bi-journal-plus"></span>
-        </a>
-    {% else %}
-        <span class="btn btn-success rounded-circle d-flex align-items-center justify-content-center disabled" style="width:60px; height:60px; font-size:1.7rem; opacity:0.5;">
-            <span class="bi bi-journal-plus"></span>
-        </span>
-    {% endif %}
-    {% if environments %}
-        <a href="{{ url_for('add_environment_log_global')|relative_url }}" class="btn btn-warning rounded-circle d-flex align-items-center justify-content-center" style="width:60px; height:60px; font-size:1.7rem;">
-            <span class="bi-journal-plus"></span>
-        </a>
-    {% else %}
-        <span class="btn btn-warning rounded-circle d-flex align-items-center justify-content-center disabled" style="width:60px; height:60px; font-size:1.7rem; opacity:0.5;">
-            <span class="bi-journal-plus"></span>
-        </span>
-    {% endif %}
-    <!-- Export-Button rechts -->
-    <a href="{{ url_for('export_logs')|relative_url }}" class="btn d-flex align-items-center justify-content-center" style="background:#8e44ad; color:white; border-radius:50%; width:60px; height:60px; font-size:1.7rem; box-shadow:0 2px 8px #0001;">
-        <span class="bi bi-download"></span>
-    </a>
-</div>
+<nav class="quick" aria-label="Schnellerfassung">
+  <a href="plant_actions/add" {% if not plants %}aria-disabled="true"{% endif %}>{{ icon('drop') }}<span>Aktion eintragen<small>Gießen, Düngen, Training</small></span></a>
+  <a href="plant_log/add" {% if not plants %}aria-disabled="true"{% endif %}>{{ icon('gauge') }}<span>Pflanze messen<small>pH, EC, Höhe</small></span></a>
+  <a href="environment_log/add" {% if not environments %}aria-disabled="true"{% endif %}>{{ icon('sun') }}<span>Klima erfassen<small>Temperatur, Feuchte, VPD</small></span></a>
+  <a href="image/add" {% if not (plants or environments) %}aria-disabled="true"{% endif %}>{{ icon('camera') }}<span>Fotos hochladen<small>für Pflanze oder Zelt</small></span></a>
+</nav>
 
-<div class="mx-auto" style="max-width: 600px; min-width:0; width:100%;">
-    <h3>Umgebungen <a href="{{ url_for('add_environment')|relative_url }}" class="btn btn-success btn-sm">+</a></h3>
-    <ul class="list-group mb-4">
-        {% for env in environments %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-                {% if env.preview_img %}
-                    <a href="{{ url_for('environment_overview', env_id=env.id)|relative_url }}">
-                        <img src="{{ url_for('uploaded_file', filename=env.preview_img.filename)|relative_url }}" alt="Bild" class="me-2" style="width:56px; height:56px; object-fit:cover; border-radius:6px;">
-                    </a>
-                {% else %}
-                    <a href="{{ url_for('environment_overview', env_id=env.id)|relative_url }}">
-                        <div class="me-2" style="width:56px; height:56px; background:#e9ecef; border-radius:6px;"></div>
-                    </a>
-                {% endif %}
-                <div>
-                    <a href="{{ url_for('environment_overview', env_id=env.id)|relative_url }}" style="text-decoration:none; color:inherit;">
-                        <strong>{{ env.name }}</strong>
-                    </a>
-                    <span class="d-block small text-muted">Autom. Bewässerung: {{ 'Ja' if env.auto_watering else 'Nein' }} | Belichtungszeit: {{ env.exposure_time }}h</span>
-                </div>
-            </div>
-            <div>
-                <a href="{{ url_for('edit_environment', env_id=env.id)|relative_url }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
-                <form method="POST" action="{{ url_for('delete_environment', env_id=env.id)|relative_url }}" style="display:inline;" onsubmit="return confirmDeleteEnvironment({{ env.plants|length }}, this);">
-                    <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
-                </form>
-            </div>
-        </li>
-        {% else %}
-        <li class="list-group-item">Keine Umgebungen vorhanden.</li>
+{% if not environments and not plants %}
+<section class="card" style="text-align:center;padding:2.5rem 1.25rem">
+  <h2>Leg los mit deinem ersten Grow</h2>
+  <p style="color:var(--muted);margin:0.5rem auto 1.25rem;max-width:44ch">Lege zuerst eine Umgebung an, zum Beispiel dein Zelt, und füge dann Pflanzen hinzu. Pflanzen ohne Umgebung landen unter „Draußen“.</p>
+  <div class="btn-row" style="justify-content:center">
+    <a href="environment/add" class="btn btn--primary">{{ icon('tent') }} Umgebung anlegen</a>
+    <a href="plant/add" class="btn">Pflanze ohne Umgebung</a>
+  </div>
+</section>
+{% endif %}
+
+{% for env in environments %}
+{% set env_plants = plants|selectattr('environment_id', 'equalto', env.id)|list %}
+<section class="bay" aria-labelledby="env-{{ env.id }}">
+  <header class="bay__head">
+    {% if env.preview_img %}
+      <img class="bay__thumb" src="uploads/{{ env.preview_img.filename }}" alt="">
+    {% else %}
+      <span class="bay__thumb"></span>
+    {% endif %}
+    <div class="bay__title">
+      <h2 id="env-{{ env.id }}" style="font-size:var(--step-1)"><a href="environment/{{ env.id }}">{{ env.name }}</a></h2>
+      <ul class="facts">
+        {% if env.length and env.width %}<li>{{ env.length|num }} × {{ env.width|num }}{% if env.height %} × {{ env.height|num }}{% endif %} cm</li>{% endif %}
+        {% if env.light_enabled %}<li>{{ icon('sun') }} {{ env.exposure_time }}/{{ 24 - (env.exposure_time or 0) }} h</li>{% endif %}
+        {% set watts = env.lamps|sum(attribute='power') %}
+        {% if watts %}<li>{{ icon('bolt') }} {{ watts }} W</li>{% endif %}
+        {% set latest = env.latest_measurements %}
+        {% for key in ['umgebungstemperatur', 'luftfeuchtigkeit', 'vpd'] if key in latest %}
+          {% set m = latest[key][0] %}
+          <li><strong>{{ m.value|num if m.value is not none else (m.min_value|num ~ '–' ~ m.max_value|num) }}{{ ' °C' if key == 'umgebungstemperatur' else (' %' if key == 'luftfeuchtigkeit' else ' kPa') }}</strong></li>
         {% endfor %}
-    </ul>
+      </ul>
+    </div>
+    <a href="plant/add?env_id={{ env.id }}" class="btn btn--quiet btn--small" title="Pflanze in {{ env.name }} anlegen">{{ icon('plus') }}<span>Pflanze</span></a>
+  </header>
+  {% if env_plants %}
+  <ul class="plant-list">
+    {% for plant in env_plants %}{{ plant_row(plant) }}{% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">Noch keine Pflanzen. <a href="plant/add?env_id={{ env.id }}">Pflanze hinzufügen</a></p>
+  {% endif %}
+</section>
+{% endfor %}
 
-    <h3>Pflanzen <a href="{{ url_for('add_plant')|relative_url }}" class="btn btn-success btn-sm">+</a></h3>
-    <ul class="list-group mb-4">
-        {% for plant in plants %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-                {% if plant.preview_img %}
-                    <a href="{{ url_for('plant_overview', plant_id=plant.id)|relative_url }}">
-                        <img src="{{ url_for('uploaded_file', filename=plant.preview_img.filename)|relative_url }}" alt="Bild" class="me-2" style="width:56px; height:56px; object-fit:cover; border-radius:6px;">
-                    </a>
-                {% else %}
-                    <a href="{{ url_for('plant_overview', plant_id=plant.id)|relative_url }}">
-                        <div class="me-2" style="width:56px; height:56px; background:#e9ecef; border-radius:6px;"></div>
-                    </a>
-                {% endif %}
-                <div>
-                    <a href="{{ url_for('plant_overview', plant_id=plant.id)|relative_url }}" style="text-decoration:none; color:inherit;">
-                        <strong>{{ plant.pflanzenname }}</strong>
-                    </a>
-                    <span class="badge bg-light text-dark border ms-2">Anzahl: {{ plant.count }}</span>
-                    {% if plant.environment %}
-                        <span class="text-muted ms-2">({{ plant.environment.name }})</span>
-                    {% endif %}
-                </div>
-            </div>
-            <div>
-                <a href="{{ url_for('edit_plant', plant_id=plant.id)|relative_url }}" class="btn btn-sm btn-primary" title="Bearbeiten">&#9998;</a>
-                <form method="POST" action="{{ url_for('delete_plant', plant_id=plant.id)|relative_url }}" style="display:inline;" onsubmit="return confirm('Pflanze wirklich löschen? Alle zugehörigen Bilder werden entfernt!');">
-                    <button type="submit" class="btn btn-sm btn-danger" title="Löschen">&#10005;</button>
-                </form>
-            </div>
-        </li>
-        {% else %}
-        <li class="list-group-item">Keine Pflanzen vorhanden.</li>
-        {% endfor %}
-    </ul>
-
-    <!-- Logout-Link als Text unten mittig -->
-</div>
-<script>
-function confirmDeleteEnvironment(plantCount, form) {
-    if (!confirm('Umgebung wirklich löschen?')) return false;
-    if (plantCount > 0) {
-        if (confirm('Alle zugehörigen Pflanzen auch löschen? (Abbrechen = Pflanzen behalten und auf Aussenbereich verschieben)')) {
-            // Standard: alles löschen (kein Parameter)
-            return true;
-        } else {
-            // Pflanzen behalten: Umgebung löschen, Pflanzen verschieben
-            let url = form.action;
-            if (url.indexOf('?') === -1) url += '?move_plants=1';
-            else url += '&move_plants=1';
-            form.action = url;
-            return true;
-        }
-    }
-    return true;
-}
-    </script>
-
-<div class="text-center mt-5 mb-3">
-    <a href="{{ url_for('logout')|relative_url }}" style="color:#888; text-decoration:underline; font-size:1.08em;">Ausloggen</a>
-</div>
+{% set outdoor = plants|selectattr('environment_id', 'none')|list %}
+{% if outdoor %}
+<section class="bay bay--outdoor" aria-labelledby="env-outdoor">
+  <header class="bay__head">
+    <div class="bay__title">
+      <h2 id="env-outdoor" style="font-size:var(--step-1)">Draußen</h2>
+      <ul class="facts"><li>Pflanzen ohne Umgebung</li></ul>
+    </div>
+  </header>
+  <ul class="plant-list">
+    {% for plant in outdoor %}{{ plant_row(plant) }}{% endfor %}
+  </ul>
+</section>
+{% endif %}
 {% endblock %}
-
-

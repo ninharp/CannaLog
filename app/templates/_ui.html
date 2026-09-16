@@ -1,0 +1,137 @@
+{% macro icon(name, label=None) -%}
+<svg class="icon" {% if label %}role="img" aria-label="{{ label }}"{% else %}aria-hidden="true"{% endif %}><use href="#i-{{ name }}"/></svg>
+{%- endmacro %}
+
+{% macro field(f, hint=None, class_='') -%}
+<div class="field {{ class_ }}">
+  {{ f.label }}
+  {{ f(**kwargs) }}
+  {% if hint %}<div class="field__hint">{{ hint }}</div>{% endif %}
+  {% for error in f.errors %}<div class="field__error">{{ error }}</div>{% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro check(f) -%}
+<label class="check">{{ f() }} {{ f.label.text }}</label>
+{%- endmacro %}
+
+{% macro form_errors(form) -%}
+{% if form.errors %}
+<div class="flash"><div class="flash__item flash__item--danger">
+  Bitte prüfe die markierten Felder.
+  {% if form.errors.get('csrf_token') %}Das Formular war zu lange offen, lade die Seite neu.{% endif %}
+</div></div>
+{% endif %}
+{%- endmacro %}
+
+{% macro phase(current, phases, large=False) -%}
+{% set idx = phases.index(current) if current in phases else -1 %}
+<div class="phase {% if large %}phase--large{% endif %}">
+  <div class="phase__track" role="img" aria-label="Phase {{ current or 'unbekannt' }}">
+    {% for p in phases %}
+      <span class="phase__step {% if loop.index0 < idx %}is-done{% elif loop.index0 == idx %}is-current{% endif %}" data-phase="{{ p }}"></span>
+    {% endfor %}
+  </div>
+  {% if large %}
+  <div class="phase__names">{% for p in phases %}<span {% if p == current %}class="is-current"{% endif %}>{{ p }}</span>{% endfor %}</div>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro reading(m, labels, short=False) -%}
+{% set label = labels.get(m.type, m.type) %}
+{% set unit = label.split('(')[1].rstrip(')') if '(' in label else '' %}
+{% set name = label.split(' (')[0] %}
+{% if m.value is not none %}
+<li class="reading"><span>{{ name }}</span><b>{{ m.value|num }}{% if unit %} {{ unit }}{% endif %}</b></li>
+{% else %}
+<li class="reading reading--range"><span>{{ name }}</span><b>{{ m.min_value|num }}–{{ m.max_value|num }}{% if unit %} {{ unit }}{% endif %}</b></li>
+{% endif %}
+{%- endmacro %}
+
+{% macro measurement_rows(form) -%}
+<div class="measure-list" id="measurements-list">
+  {% for mform in form.measurements %}
+  <div class="measure-row measurement-row">
+    <div class="field field--type">{{ mform.form.type.label }} {{ mform.form.type() }}</div>
+    <div class="field">{{ mform.form.value.label }} {{ mform.form.value(inputmode="decimal", oninput="disableMinMax(this)") }}</div>
+    <div class="field">{{ mform.form.min_value.label }} {{ mform.form.min_value(inputmode="decimal", oninput="disableValue(this)") }}</div>
+    <div class="field">{{ mform.form.max_value.label }} {{ mform.form.max_value(inputmode="decimal", oninput="disableValue(this)") }}</div>
+    <button type="button" class="btn btn--quiet btn--icon" onclick="removeMeasurementRow(this)" title="Messung entfernen">{{ icon('trash', 'Messung entfernen') }}</button>
+  </div>
+  {% endfor %}
+</div>
+<div><button type="button" class="btn btn--small" onclick="addMeasurementRow()">{{ icon('plus') }} Weitere Messung</button></div>
+<script>
+function reindexMeasurementRows() {
+  document.querySelectorAll('#measurements-list .measurement-row').forEach((row, idx) => {
+    row.querySelectorAll('input,select,label').forEach(el => {
+      if (el.name) el.name = el.name.replace(/measurements-\d+-/, `measurements-${idx}-`);
+      if (el.id) el.id = el.id.replace(/measurements-\d+-/, `measurements-${idx}-`);
+      if (el.htmlFor) el.htmlFor = el.htmlFor.replace(/measurements-\d+-/, `measurements-${idx}-`);
+    });
+  });
+}
+function addMeasurementRow() {
+  const list = document.getElementById('measurements-list');
+  const rows = list.getElementsByClassName('measurement-row');
+  if (rows.length >= 6) return;
+  const clone = rows[rows.length - 1].cloneNode(true);
+  clone.querySelectorAll('input,select').forEach(el => { el.value = ''; el.disabled = false; });
+  list.appendChild(clone);
+  reindexMeasurementRows();
+  clone.querySelector('select').focus();
+}
+function removeMeasurementRow(btn) {
+  const row = btn.closest('.measurement-row');
+  const list = document.getElementById('measurements-list');
+  if (list.getElementsByClassName('measurement-row').length > 1) {
+    row.remove();
+    reindexMeasurementRows();
+  } else {
+    row.querySelectorAll('input,select').forEach(el => { el.value = ''; el.disabled = false; });
+  }
+}
+function disableMinMax(input) {
+  const row = input.closest('.measurement-row');
+  row.querySelectorAll('input[name$="min_value"], input[name$="max_value"]').forEach(el => el.disabled = !!input.value);
+}
+function disableValue(input) {
+  const row = input.closest('.measurement-row');
+  const min = row.querySelector('input[name$="min_value"]'), max = row.querySelector('input[name$="max_value"]');
+  row.querySelector('input[name$="-value"]').disabled = !!(min.value || max.value);
+}
+document.querySelectorAll('#measurements-list .measurement-row').forEach(row => {
+  const v = row.querySelector('input[name$="-value"]');
+  if (v.value) disableMinMax(v);
+  else disableValue(row.querySelector('input[name$="min_value"]'));
+});
+</script>
+{%- endmacro %}
+
+{% macro image_picker(images, preview_id, delete_label='Bild löschen') -%}
+<input type="hidden" id="preview_image_id" name="preview_image_id" value="{{ preview_id or -1 }}">
+<input type="hidden" id="delete_image_id" name="delete_image_id" value="">
+<div class="image-picker" id="image-picker">
+  {% for img in images %}
+  <figure>
+    <button type="button" class="thumb" aria-pressed="{{ 'true' if img.id == preview_id else 'false' }}" data-id="{{ img.id }}" title="Als Vorschaubild verwenden">
+      <img src="uploads/{{ img.filename }}" alt="Bild {{ loop.index }}">
+    </button>
+    <button type="button" class="btn btn--quiet btn--small btn--danger" data-delete="{{ img.id }}">{{ icon('trash') }} Löschen</button>
+  </figure>
+  {% endfor %}
+</div>
+<script>
+document.querySelectorAll('#image-picker .thumb').forEach(btn => btn.addEventListener('click', () => {
+  document.querySelectorAll('#image-picker .thumb').forEach(b => b.setAttribute('aria-pressed', 'false'));
+  btn.setAttribute('aria-pressed', 'true');
+  document.getElementById('preview_image_id').value = btn.dataset.id;
+}));
+document.querySelectorAll('#image-picker [data-delete]').forEach(btn => btn.addEventListener('click', () => {
+  if (!confirm('{{ delete_label }}?')) return;
+  document.getElementById('delete_image_id').value = btn.dataset.delete;
+  btn.closest('form').submit();
+}));
+</script>
+{%- endmacro %}

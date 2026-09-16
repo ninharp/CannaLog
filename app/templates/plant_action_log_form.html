@@ -1,64 +1,32 @@
 {% extends 'base.html' %}
-{% block title %}Pflanzenaktion{% endblock %}
+{% from '_ui.html' import icon, field, form_errors %}
+{% set pid = form.plant_id.data or (log.plant_id if edit and log else None) %}
+{% set back = 'plant/' ~ pid if pid else 'dashboard' %}
+{% block title %}{{ 'Aktion bearbeiten' if edit else 'Aktion eintragen' }} – CannaLog{% endblock %}
+{% block page_class %}page--narrow{% endblock %}
 {% block content %}
-<div class="mx-auto" style="max-width:600px; min-width:0; width:100%;">
-    <div class="d-flex align-items-center mb-4" style="gap:1rem;">
-    <a href="dashboard">
-    <img src="static/assets/logo_small.png" alt="Logo" class="logo-small" style="height:60px; width:auto; display:block; cursor:pointer;">
-        </a>
-        <h1 class="mb-0 fw-bold" style="font-size:1.8rem; line-height:60px;">Aktion hinzufügen</h1>
-    </div>
-    <form method="POST">
-    {{ form.hidden_tag() }}
-    {% if form.errors %}
-    <div class="alert alert-danger">
-        <b>Fehler beim Speichern:</b>
-        <ul>
-        {% for field, errors in form.errors.items() %}
-            <li><b>{{ form[field].label.text if field in form else field }}:</b> {{ errors|join(', ') }}</li>
-        {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
-    <div class="mb-3">
-        {{ form.plant_id.label(class="form-label") }}
-        {{ form.plant_id(class="form-select") }}
-        {% for error in form.plant_id.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-    </div>
-    <div class="mb-3">
-        {{ form.date.label(class="form-label") }}
-        {{ form.date(class="form-control") }}
-        {% for error in form.date.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-    </div>
-    <div class="mb-3">
-        {{ form.action.label(class="form-label") }}
-        {{ form.action(class="form-select") }}
-        {% for error in form.action.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-    </div>
-    <div class="mb-3">
-        {{ form.notes.label(class="form-label") }}
-        {{ form.notes(class="form-control", rows=3) }}
-        {% for error in form.notes.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-    </div>
-    <div class="d-flex justify-content-between align-items-center mt-4">
-        <div>
-            {% set pid = form.plant_id.data if form.plant_id.data else (log.plant_id if edit and log else None) %}
-            {% if pid %}
-                <a href="plant/{{ pid }}" class="btn btn-secondary">Zurück</a>
-            {% else %}
-                <a href="dashboard" class="btn btn-secondary">Zurück</a>
-            {% endif %}
-        </div>
-        <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-success">Speichern</button>
-        </div>
-    </div>
+<div class="page-head">
+  <div class="page-head__title">
+    <a class="back" href="{{ back }}">{{ icon('back') }} Zurück</a>
+    <h1>{{ 'Aktion bearbeiten' if edit else 'Aktion eintragen' }}</h1>
+  </div>
+</div>
+{{ form_errors(form) }}
+<form method="POST">
+  {{ form.hidden_tag() }}
+  <section class="card form">
+    {{ field(form.plant_id) }}
+    <div class="grid-2">{{ field(form.action) }}{{ field(form.date) }}</div>
+    {{ field(form.notes, rows=3, placeholder="Menge, Dünger, Details …") }}
+  </section>
+  <div class="form-actions">
+    <a href="{{ back }}" class="btn btn--quiet">Abbrechen</a>
+    <div class="form-actions__main"><button type="submit" class="btn btn--primary">Aktion speichern</button></div>
+  </div>
 </form>
 {% if edit %}
-<div class="d-flex justify-content-end mt-2">
-    <form method="POST" action="plant_actions/{{ log.id }}/delete" onsubmit="return confirm('Aktion wirklich löschen?');" style="display:inline;">
-        <button type="submit" class="btn btn-danger">Löschen</button>
-    </form>
-</div>
+<form method="POST" action="plant_actions/{{ log.id }}/delete" onsubmit="return confirm('Aktion löschen?');" style="margin-top:1.5rem">
+  <button type="submit" class="btn btn--quiet btn--danger btn--small">{{ icon('trash') }} Aktion löschen</button>
+</form>
 {% endif %}
 {% endblock %}
