@@ -1,5 +1,4 @@
-from app import db, app
+from app.schema import upgrade_schema
 
-with app.app_context():
-    db.create_all()
-    print("DB tables created.")
+upgrade_schema()
+print("Database schema is up to date.")

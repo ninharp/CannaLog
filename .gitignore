@@ -1,9 +1,10 @@
-*.pyc
-*.pyo
-*.pyd
-__pycache__/** */
-migrations/
+__pycache__/
+*.py[cod]
+.venv/
 venv/
 instance/
-app/static/uploads/**
+data/
+migrations/
 bak/
+.DS_Store
+docs/superpowers/

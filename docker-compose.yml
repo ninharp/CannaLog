@@ -1,0 +1,13 @@
+services:
+  cannalog:
+    image: ghcr.io/ninharp/cannalog:latest
+    # build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/data
+    environment:
+      # SECRET_KEY: bleibt leer -> wird einmalig erzeugt und in /data gespeichert
+      ALLOW_REGISTRATION: "true"
+      SECURE_COOKIES: "false"
+    restart: unless-stopped

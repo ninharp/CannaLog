@@ -32,7 +32,7 @@ CannaLog ist eine moderne, private Web-App zur Verwaltung von Pflanzen, Umgebung
 ![Pflanzen-Edit](assets/screenshot_env_edit.jpg)
 
 ### Umgebungs-Logbuch
-![Pflanzen-Logbuch](assets/screenshot_plant_log.jpg)
+![Umgebungs-Logbuch](assets/screenshot_env_log.jpg)
 
 ### Pflanzenübersicht
 ![Pflanzenübersicht](assets/screenshot_plant_overview.jpg)
@@ -47,43 +47,46 @@ CannaLog ist eine moderne, private Web-App zur Verwaltung von Pflanzen, Umgebung
 ![Pflanzen-Edit](assets/screenshot_plant_edit.jpg)
 
 
-## Installation & Ausführung
+## Installation
 
-### Voraussetzungen
-- Python 3.10+
-- pip
-- (optional) Virtuelle Umgebung
+### Home Assistant
 
-### Setup
-1. Repository klonen:
-   ```bash
-   git clone <repo-url>
-   cd cannalog
-   ```
-2. Virtuelle Umgebung erstellen (empfohlen):
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
-3. Abhängigkeiten installieren:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Datenbank initialisieren:
-   ```bash
-   flask db upgrade
-   ```
-5. App starten:
-   ```bash
-   flask run
-   ```
+CannaLog gibt es als Home-Assistant-App mit Seitenleiste (Ingress) und direktem Port:
+[ninharp/CannaLog_HomeAssistant](https://github.com/ninharp/CannaLog_HomeAssistant)
 
-Die App ist dann unter http://127.0.0.1:5000 erreichbar.
+### Docker
 
-### Hinweise
-- Standardmäßig werden Bilder im Ordner `/uploads` gespeichert.
-- Die Konfiguration erfolgt über die Datei `config.py`.
-- Für den Produktivbetrieb sollten Debug-Modus und Secret-Key angepasst werden.
+```bash
+docker compose up -d
+```
+
+Die App läuft dann auf http://localhost:5000, Datenbank, Bilder und der erzeugte
+Sitzungsschlüssel liegen in `./data`.
+
+| Variable | Standard | Bedeutung |
+| --- | --- | --- |
+| `SECRET_KEY` | leer | Leer: wird einmalig erzeugt und in `/data/secret_key` gespeichert |
+| `ALLOW_REGISTRATION` | `true` | Neue Konten erlauben |
+| `SECURE_COOKIES` | `false` | Cookies nur über HTTPS senden (hinter einem HTTPS-Proxy einschalten) |
+| `MAX_UPLOAD_MB` | `20` | Maximale Upload-Größe |
+| `CANNALOG_DATA_DIR` | `instance/` bzw. `/data` | Ablage für Datenbank, Uploads und Schlüssel |
+
+### Lokal entwickeln
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python init_db.py
+.venv/bin/python run.py
+```
+
+Für den PDF-Export braucht WeasyPrint Pango (`brew install pango` bzw. `apk add pango`).
+
+## Releases
+
+Ein Tag `vX.Y.Z` baut per GitHub Actions `ghcr.io/ninharp/cannalog` (Standalone) und
+`ghcr.io/ninharp/{aarch64,amd64}-cannalog-addon` (Home Assistant). Danach im
+HA-Repository `version` in `cannalog/config.yaml` anheben.
 
 ## Lizenz
 MIT License

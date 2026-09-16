@@ -8,7 +8,7 @@ class PlantActionLog(db.Model):
     date = db.Column(db.Date, nullable=False)
     notes = db.Column(db.Text)
     action = db.Column(db.String(50), nullable=False)
-    plant = db.relationship('Plant', backref='action_logs')
+    plant = db.relationship('Plant', back_populates='actions')
 class PlantLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     plant_id = db.Column(db.Integer, db.ForeignKey('plant.id'), nullable=False)
@@ -52,13 +52,14 @@ class Environment(db.Model):
     exposure_time = db.Column(db.Integer, default=18)  # Stunden 0-24
     notes = db.Column(db.Text)
     images = db.relationship('EnvironmentImage', backref='environment', lazy=True, cascade='all, delete-orphan', foreign_keys='EnvironmentImage.environment_id')
-    preview_image_id = db.Column(db.Integer, db.ForeignKey('environment_image.id'), nullable=True)
+    preview_image_id = db.Column(db.Integer, db.ForeignKey('environment_image.id', use_alter=True, name='fk_environment_preview_image'), nullable=True)
     length = db.Column(db.Float)  # Meter
     width = db.Column(db.Float)
     height = db.Column(db.Float)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     plants = db.relationship('Plant', backref='environment', lazy=True)
     lamps = db.relationship('Lamp', back_populates='environment', cascade='all, delete-orphan')
+    logs = db.relationship('EnvironmentLog', backref='environment', cascade='all, delete-orphan')
 
 class PlantImage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -79,5 +80,6 @@ class Plant(db.Model):
     environment_id = db.Column(db.Integer, db.ForeignKey('environment.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     images = db.relationship('PlantImage', backref='plant', lazy=True, cascade='all, delete-orphan', foreign_keys='PlantImage.plant_id')
-    preview_image_id = db.Column(db.Integer, db.ForeignKey('plant_image.id'), nullable=True)
-    actions = db.relationship('PlantActionLog', backref='plant_action_parent', cascade='all, delete-orphan')
+    preview_image_id = db.Column(db.Integer, db.ForeignKey('plant_image.id', use_alter=True, name='fk_plant_preview_image'), nullable=True)
+    actions = db.relationship('PlantActionLog', back_populates='plant', cascade='all, delete-orphan')
+    logs = db.relationship('PlantLog', backref='plant', cascade='all, delete-orphan')

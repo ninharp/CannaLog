@@ -1,11 +1,9 @@
 # --- Log-Export Formular ---
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed
-from flask_login import current_user
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, DateField, IntegerField, FileField, SelectField, FloatField, FieldList, FormField, MultipleFileField, SelectMultipleField
-from wtforms.validators import DataRequired, Length, EqualTo, ValidationError, Optional
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, DateField, IntegerField, SelectField, FloatField, FieldList, FormField, MultipleFileField, SelectMultipleField
+from wtforms.validators import DataRequired, Length, EqualTo, Optional
 from datetime import date as dt_date
-from app.models import Plant
 
 class LogExportForm(FlaskForm):
     environment_id = SelectField('Umgebung', coerce=int, validators=[DataRequired()])
@@ -33,8 +31,6 @@ PLANT_ACTIONS = [
 ]
 
 class PlantActionLogForm(FlaskForm):
-    class Meta:
-        csrf = True
     plant_id = SelectField('Pflanze', coerce=int, validators=[DataRequired()])
     date = DateField('Datum', format='%Y-%m-%d', default=dt_date.today, validators=[DataRequired()])
     action = SelectField('Aktion', choices=PLANT_ACTIONS, validators=[DataRequired()])
@@ -106,16 +102,12 @@ class EnvironmentMeasurementForm(FlaskForm):
     max_value = FloatField('Max', validators=[Optional()], render_kw={"step": "any"})
 
 class PlantLogForm(FlaskForm):
-    class Meta:
-        csrf = True
     date = DateField('Datum', format='%Y-%m-%d', default=dt_date.today, validators=[DataRequired()])
     notes = TextAreaField('Notizen', validators=[Optional()])
     measurements = FieldList(FormField(MeasurementForm), min_entries=1, max_entries=6)
     submit = SubmitField('Speichern')
 
 class EnvironmentLogForm(FlaskForm):
-    class Meta:
-        csrf = True
     date = DateField('Datum', format='%Y-%m-%d', default=dt_date.today, validators=[DataRequired()])
     notes = TextAreaField('Notizen', validators=[Optional()])
     measurements = FieldList(FormField(EnvironmentMeasurementForm), min_entries=1, max_entries=6)
