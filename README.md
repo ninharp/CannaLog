@@ -72,6 +72,13 @@ python3 -m venv .venv
 
 Für den PDF-Export braucht WeasyPrint Pango (`brew install pango` bzw. `apk add pango`).
 
+Tests:
+
+```bash
+.venv/bin/pip install pytest
+.venv/bin/python -m pytest
+```
+
 ## Releases
 
 Ein Tag `vX.Y.Z` baut per GitHub Actions `ghcr.io/ninharp/cannalog` (Standalone) und

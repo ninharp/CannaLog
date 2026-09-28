@@ -3,7 +3,7 @@
 {%- endmacro %}
 
 {% macro field(f, hint=None, class_='') -%}
-<div class="field {{ class_ }}">
+<div class="field {{ class_ }} {% if f.errors %}field--invalid{% endif %}">
   {{ f.label }}
   {{ f(**kwargs) }}
   {% if hint %}<div class="field__hint">{{ hint }}</div>{% endif %}
@@ -17,9 +17,18 @@
 
 {% macro form_errors(form) -%}
 {% if form.errors %}
+{% set problems = form_problems(form) %}
 <div class="flash"><div class="flash__item flash__item--danger">
-  Bitte prüfe die markierten Felder.
-  {% if form.errors.get('csrf_token') %}Das Formular war zu lange offen, lade die Seite neu.{% endif %}
+  {% if form.errors.get('csrf_token') %}
+    <strong>Nicht gespeichert.</strong> Das Formular war zu lange offen. Lade die Seite neu und trag es noch einmal ein.
+  {% elif problems %}
+    <strong>Nicht gespeichert.</strong>
+    <ul style="margin:0.4rem 0 0;padding-left:1.1rem">
+      {% for label, message in problems %}<li>{{ label }}: {{ message }}</li>{% endfor %}
+    </ul>
+  {% else %}
+    <strong>Nicht gespeichert.</strong> Bitte prüfe deine Eingaben.
+  {% endif %}
 </div></div>
 {% endif %}
 {%- endmacro %}
@@ -53,10 +62,10 @@
 <div class="measure-list" id="measurements-list">
   {% for mform in form.measurements %}
   <div class="measure-row measurement-row">
-    <div class="field field--type">{{ mform.form.type.label }} {{ mform.form.type() }}</div>
-    <div class="field">{{ mform.form.value.label }} {{ mform.form.value(inputmode="decimal", oninput="disableMinMax(this)") }}</div>
-    <div class="field">{{ mform.form.min_value.label }} {{ mform.form.min_value(inputmode="decimal", oninput="disableValue(this)") }}</div>
-    <div class="field">{{ mform.form.max_value.label }} {{ mform.form.max_value(inputmode="decimal", oninput="disableValue(this)") }}</div>
+    {{ field(mform.form.type, class_='field--type') }}
+    {{ field(mform.form.value, inputmode="decimal", oninput="disableMinMax(this)") }}
+    {{ field(mform.form.min_value, inputmode="decimal", oninput="disableValue(this)") }}
+    {{ field(mform.form.max_value, inputmode="decimal", oninput="disableValue(this)") }}
     <button type="button" class="btn btn--quiet btn--icon" onclick="removeMeasurementRow(this)" title="Messung entfernen">{{ icon('trash', 'Messung entfernen') }}</button>
   </div>
   {% endfor %}

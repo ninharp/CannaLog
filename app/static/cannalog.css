@@ -280,7 +280,8 @@ p { margin: 0; }
 .form-actions__main { display: flex; gap: 0.5rem; margin-left: auto; }
 
 .measure-list { display: grid; gap: 0.6rem; }
-.measure-row { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto; gap: 0.5rem; align-items: end; }
+.measure-row { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto; gap: 0.5rem; align-items: start; }
+.measure-row > .btn { margin-top: 1.55rem; }
 .measure-row .field > label { font-weight: 500; color: var(--muted); }
 .measure-row + .measure-row .field > label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
@@ -382,3 +383,7 @@ p { margin: 0; }
 .report-screen { display: grid; gap: 1.25rem; }
 .report-screen h2 { font-size: var(--step-2); }
 .report-screen h3 { margin-bottom: 0.4rem; }
+
+.field--invalid input, .field--invalid select, .field--invalid textarea { border-color: var(--danger); background: #fffaf9; }
+.field--invalid input:focus, .field--invalid select:focus, .field--invalid textarea:focus { box-shadow: 0 0 0 3px rgb(168 50 31 / 18%); }
+.field--invalid > label { color: var(--danger); }

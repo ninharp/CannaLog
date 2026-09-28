@@ -134,6 +134,24 @@ def num_filter(value):
     return text.replace('.', ',')
 
 
+def form_problems(form, prefix=''):
+    """Alle Fehler eines Formulars als (Feldbezeichnung, Meldung), auch aus Unterformularen."""
+    problems = []
+    for field in form:
+        label = f"{prefix}{field.label.text}" if hasattr(field, 'label') else prefix
+        if hasattr(field, 'entries'):  # FieldList
+            for index, entry in enumerate(field.entries, start=1):
+                problems += form_problems(entry.form, prefix=f"{field.label.text} {index}, ")
+        elif hasattr(field, 'form'):  # FormField
+            problems += form_problems(field.form, prefix=f"{label}: ")
+        else:
+            problems += [(label, error) for error in field.errors if isinstance(error, str)]
+    return problems
+
+
+app.jinja_env.globals['form_problems'] = form_problems
+
+
 @app.template_filter('datum')
 def datum_filter(value):
     return value.strftime('%d.%m.%Y') if value else ''

@@ -1,11 +1,21 @@
 # --- Log-Export Formular ---
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed
+from wtforms.i18n import get_translations as _wtforms_translations
 from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, DateField, IntegerField, SelectField, FloatField, FieldList, FormField, MultipleFileField, SelectMultipleField
 from wtforms.validators import DataRequired, Length, EqualTo, Optional
 from datetime import date as dt_date
 
-class LogExportForm(FlaskForm):
+
+class BaseForm(FlaskForm):
+    """Alle Formulare: deutsche Fehlermeldungen von WTForms."""
+
+    class Meta:
+        def get_translations(self, form):
+            return _wtforms_translations(['de'])
+
+
+class LogExportForm(BaseForm):
     environment_id = SelectField('Umgebung', coerce=int, validators=[DataRequired()])
     plant_ids = SelectMultipleField('Pflanzen', coerce=int, validators=[Optional()])
     include_env_logs = BooleanField('Klimawerte der Umgebung', default=True)
@@ -30,7 +40,7 @@ PLANT_ACTIONS = [
     ('sonstiges', 'Sonstiges'),
 ]
 
-class PlantActionLogForm(FlaskForm):
+class PlantActionLogForm(BaseForm):
     plant_id = SelectField('Pflanze', coerce=int, validators=[DataRequired()])
     date = DateField('Datum', format='%Y-%m-%d', default=dt_date.today, validators=[DataRequired()])
     action = SelectField('Aktion', choices=PLANT_ACTIONS, validators=[DataRequired()])
@@ -84,7 +94,7 @@ ENV_PHASE_TYPES = [
     ('Fermentierung', 'Fermentierung')
 ]
 
-class MeasurementForm(FlaskForm):
+class MeasurementForm(BaseForm):
     class Meta:
         csrf = False
     type = SelectField('Messwert', choices=MEASUREMENT_TYPES, validators=[Optional()])
@@ -93,7 +103,7 @@ class MeasurementForm(FlaskForm):
     max_value = FloatField('Max', validators=[Optional()], render_kw={"step": "any"})
 
 # Für EnvironmentLog eigene MeasurementForm mit anderen Typen
-class EnvironmentMeasurementForm(FlaskForm):
+class EnvironmentMeasurementForm(BaseForm):
     class Meta:
         csrf = False
     type = SelectField('Messwert', choices=ENV_MEASUREMENT_TYPES, validators=[Optional()])
@@ -101,38 +111,38 @@ class EnvironmentMeasurementForm(FlaskForm):
     min_value = FloatField('Min', validators=[Optional()], render_kw={"step": "any"})
     max_value = FloatField('Max', validators=[Optional()], render_kw={"step": "any"})
 
-class PlantLogForm(FlaskForm):
+class PlantLogForm(BaseForm):
     date = DateField('Datum', format='%Y-%m-%d', default=dt_date.today, validators=[DataRequired()])
     notes = TextAreaField('Notizen', validators=[Optional()])
-    measurements = FieldList(FormField(MeasurementForm), min_entries=1, max_entries=6)
+    measurements = FieldList(FormField(MeasurementForm), label='Messwert', min_entries=1, max_entries=6)
     submit = SubmitField('Speichern')
 
-class EnvironmentLogForm(FlaskForm):
+class EnvironmentLogForm(BaseForm):
     date = DateField('Datum', format='%Y-%m-%d', default=dt_date.today, validators=[DataRequired()])
     notes = TextAreaField('Notizen', validators=[Optional()])
-    measurements = FieldList(FormField(EnvironmentMeasurementForm), min_entries=1, max_entries=6)
+    measurements = FieldList(FormField(EnvironmentMeasurementForm), label='Messwert', min_entries=1, max_entries=6)
     submit = SubmitField('Speichern')
 
-class LampForm(FlaskForm):
+class LampForm(BaseForm):
     class Meta:
         csrf = False
     type = SelectField('Lampentyp', choices=ENV_LAMP_TYPES, validators=[Optional()])
     power = IntegerField('Leistung (W)', validators=[Optional()])
     kelvin = IntegerField('Farbtemperatur (K)', validators=[Optional()])  # optional
 
-class RegistrationForm(FlaskForm):
+class RegistrationForm(BaseForm):
     username = StringField('Benutzername', validators=[DataRequired(), Length(min=3, max=150)])
     password = PasswordField('Passwort', validators=[DataRequired(), Length(min=6)])
     confirm_password = PasswordField('Passwort bestätigen', validators=[DataRequired(), EqualTo('password')])
     submit = SubmitField('Registrieren')
 
-class LoginForm(FlaskForm):
+class LoginForm(BaseForm):
     username = StringField('Benutzername', validators=[DataRequired()])
     password = PasswordField('Passwort', validators=[DataRequired()])
     remember = BooleanField('Angemeldet bleiben')
     submit = SubmitField('Anmelden')
 
-class PlantForm(FlaskForm):
+class PlantForm(BaseForm):
     pflanzenname = StringField('Pflanzenname', validators=[DataRequired()])
     date = DateField('Startdatum', format='%Y-%m-%d', default=dt_date.today, validators=[Optional()])
     count = IntegerField('Anzahl Pflanzen', default=1, validators=[Optional()])
@@ -146,7 +156,7 @@ class PlantForm(FlaskForm):
     preview_image_id = IntegerField('Vorschaubild', validators=[Optional()])
     submit = SubmitField('Speichern')
 
-class EnvironmentForm(FlaskForm):
+class EnvironmentForm(BaseForm):
     name = StringField('Name', validators=[DataRequired()])
     auto_watering = BooleanField('Automatische Bewässerung')
     light_enabled = BooleanField('Mit Lampe und festem Lichtzyklus')
@@ -157,5 +167,5 @@ class EnvironmentForm(FlaskForm):
     length = IntegerField('Länge (cm)', validators=[Optional()])
     width = IntegerField('Breite (cm)', validators=[Optional()])
     height = IntegerField('Höhe (cm)', validators=[Optional()])
-    lamps = FieldList(FormField(LampForm), min_entries=1, max_entries=10)
+    lamps = FieldList(FormField(LampForm), label='Lampe', min_entries=1, max_entries=10)
     submit = SubmitField('Speichern')

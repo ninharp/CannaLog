@@ -5,7 +5,6 @@ from datetime import datetime
 
 from flask import render_template, redirect, url_for, flash, request, send_from_directory, make_response, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
-from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed
 from sqlalchemy.orm import joinedload
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -15,7 +14,7 @@ from wtforms.validators import DataRequired
 
 from app import app, db, login_manager
 from app.forms import (
-    RegistrationForm, LoginForm, PlantForm, EnvironmentForm, PlantLogForm,
+    BaseForm, RegistrationForm, LoginForm, PlantForm, EnvironmentForm, PlantLogForm,
     EnvironmentLogForm, PlantActionLogForm, LogExportForm,
 )
 from app.lamp_model import Lamp
@@ -968,7 +967,7 @@ def add_image_global():
     # Kombiniertes Dropdown: Wert ist z.B. "plant-1" oder "env-2"
     choices = [(f"plant-{p.id}", f"Pflanze: {p.pflanzenname}") for p in plants] + \
               [(f"env-{e.id}", f"Umgebung: {e.name}") for e in environments]
-    class ImageUploadForm(FlaskForm):
+    class ImageUploadForm(BaseForm):
         target = SelectField('Wofür sind die Fotos?', choices=choices, validators=[DataRequired()])
         images = MultipleFileField('Fotos', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif', 'webp'], 'Nur Bilddateien (JPG, PNG, GIF, WebP).')])
         submit = SubmitField('Hochladen')
