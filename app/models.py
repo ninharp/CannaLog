@@ -90,10 +90,15 @@ class Plant(db.Model):
     logs = db.relationship('PlantLog', backref='plant', cascade='all, delete-orphan')
 
 
+def entry_sort_key(day, clock):
+    """Sort key for newest-first lists (use with reverse=True): later date, then later time, untimed entries last."""
+    return (day, clock is not None, clock or datetime.min.time())
+
+
 def _latest_measurements(logs):
     """Newest value per measurement type across the given logs, as {type: (measurement, date)}."""
     latest = {}
-    for log in sorted(logs, key=lambda entry: (entry.date, entry.time or datetime.min.time()), reverse=True):
+    for log in sorted(logs, key=lambda entry: entry_sort_key(entry.date, entry.time), reverse=True):
         for m in log.measurements:
             latest.setdefault(m.type, (m, log.date))
     return latest
@@ -106,7 +111,7 @@ def _age_days(self):
 
 
 def _last_action(self):
-    return max(self.actions, key=lambda action: (action.date, action.time or datetime.min.time()), default=None)
+    return max(self.actions, key=lambda action: entry_sort_key(action.date, action.time), default=None)
 
 
 Plant.age_days = property(_age_days)

@@ -20,7 +20,7 @@ from app.forms import (
 from app.lamp_model import Lamp
 from app.models import (
     User, Plant, Environment, PlantLog, EnvironmentLog, PlantActionLog,
-    Measurement, PlantImage, EnvironmentImage,
+    Measurement, PlantImage, EnvironmentImage, entry_sort_key,
 )
 
 ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
@@ -86,11 +86,11 @@ def export_logs():
                 entries += [{'type': 'log', 'obj': log, 'date': log.date, 'time': log.time} for log in plant.logs]
             if form.include_action_logs.data:
                 entries += [{'type': 'action', 'obj': action, 'date': action.date, 'time': action.time} for action in plant.actions]
-            entries.sort(key=lambda entry: (entry['date'], entry['time'] or datetime.min.time()), reverse=True)
+            entries.sort(key=lambda entry: entry_sort_key(entry['date'], entry['time']), reverse=True)
             plant_sections.append({'plant': plant, 'entries': entries})
         report = {
             'env': env,
-            'env_logs': sorted(env.logs, key=lambda log: (log.date, log.time or datetime.min.time()), reverse=True) if form.include_env_logs.data else [],
+            'env_logs': sorted(env.logs, key=lambda log: entry_sort_key(log.date, log.time), reverse=True) if form.include_env_logs.data else [],
             'plants': plant_sections,
             'generated_at': datetime.now().strftime('%d.%m.%Y, %H:%M'),
         }
@@ -123,7 +123,7 @@ def unauthorized():
 def plant_action_logs():
     # Zeige alle Aktionen für Pflanzen des Users
     plants = Plant.query.filter_by(user_id=current_user.id).all()
-    logs = PlantActionLog.query.join(Plant).filter(Plant.user_id == current_user.id).order_by(PlantActionLog.date.desc(), PlantActionLog.time.desc()).all()
+    logs = PlantActionLog.query.join(Plant).filter(Plant.user_id == current_user.id).order_by(PlantActionLog.date.desc(), PlantActionLog.time.is_(None), PlantActionLog.time.desc()).all()
     return render_template('plant_action_logs.html', logs=logs, plants=plants)
 
 @app.route('/plant_actions/add', methods=['GET', 'POST'])
@@ -665,7 +665,7 @@ def plant_overview(plant_id):
     ] + [
         {"type": "action", "obj": action, "date": action.date, "time": action.time} for action in actions
     ]
-    combined.sort(key=lambda x: (x["date"], x["time"] or datetime.min.time()), reverse=True)
+    combined.sort(key=lambda x: entry_sort_key(x["date"], x["time"]), reverse=True)
     return render_template('plant_overview.html', plant=plant, entries=combined)
     # return render_template('plant_form.html', form=form, plant=plant)
 
@@ -882,7 +882,7 @@ def environment_overview(env_id):
         return go('dashboard')
     plants = Plant.query.filter_by(environment_id=env.id, user_id=current_user.id).all()
     logs = EnvironmentLog.query.filter_by(environment_id=env.id).all()
-    logs_sorted = sorted(logs, key=lambda x: (x.date, x.time or datetime.min.time()), reverse=True)
+    logs_sorted = sorted(logs, key=lambda x: entry_sort_key(x.date, x.time), reverse=True)
     return render_template('environment_overview.html', env=env, plants=plants, entries=logs_sorted)
 
 

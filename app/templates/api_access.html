@@ -42,6 +42,11 @@
 </section>
 <section class="card">
   <h2 class="card__title">Beispielaufruf</h2>
-  <code class="token">curl -H "Authorization: Bearer &lt;token&gt;" {{ request.host_url.rstrip('/') }}{{ request.script_root }}/api/v1/status</code>
+  {% if request.script_root %}
+  <code class="token">curl -H "Authorization: Bearer &lt;token&gt;" http://&lt;home-assistant-ip&gt;:5000/api/v1/status</code>
+  <p class="card__hint">Die API ist nur über den direkten Port erreichbar, nicht über die Seitenleiste.</p>
+  {% else %}
+  <code class="token">curl -H "Authorization: Bearer &lt;token&gt;" {{ request.host_url.rstrip('/') }}/api/v1/status</code>
+  {% endif %}
 </section>
 {% endblock %}

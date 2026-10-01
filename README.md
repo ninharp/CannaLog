@@ -109,7 +109,7 @@ Eintragsarten:
 | `time` | Uhrzeit als `HH:MM`, optional |
 | `notes` | Notiz als Text, optional |
 
-Die Uhrzeit ist bei allen Einträgen optional. Sie steht in Listen und im Bericht hinter dem Datum.
+Die Uhrzeit ist bei allen Einträgen optional. Sie steht in Listen und im Bericht hinter dem Datum. Sekunden (`HH:MM:SS`) werden akzeptiert, aber verworfen. Sende `date` besser immer mit, denn ohne Angabe gilt „heute“ nach der Zeitzone des Servers.
 
 ### Status
 

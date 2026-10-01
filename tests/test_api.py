@@ -104,7 +104,7 @@ def api(web):
         return client.open(f'/api/v1{path}', method=method, data=body,
                            content_type='application/json', headers=headers)
 
-    return {'call': call, 'raw': raw, 'client': client, 'token': token,
+    return {'call': call, 'raw': raw, 'client': client, 'token': token, 'web': web,
             'env': env, 'empty': empty, 'plants': plants}
 
 
@@ -457,7 +457,7 @@ def test_token_use_is_written_at_most_once_a_minute(api):
     from datetime import datetime, timedelta
     with flask_app.app_context():
         user = User.query.filter_by(username='apiuser').one()
-        user.api_token_last_used = datetime.utcnow() - timedelta(seconds=10)
+        user.api_token_last_used = datetime.now() - timedelta(seconds=10)
         stamp = user.api_token_last_used
         db.session.commit()
     db.session.expire_all()  # requests share the fixture's app context and its session
@@ -465,19 +465,19 @@ def test_token_use_is_written_at_most_once_a_minute(api):
     with flask_app.app_context():
         assert User.query.filter_by(username='apiuser').one().api_token_last_used == stamp
         user = User.query.filter_by(username='apiuser').one()
-        user.api_token_last_used = datetime.utcnow() - timedelta(minutes=5)
+        user.api_token_last_used = datetime.now() - timedelta(minutes=5)
         db.session.commit()
     db.session.expire_all()
     api['call']('GET', '/status')
     with flask_app.app_context():
-        assert User.query.filter_by(username='apiuser').one().api_token_last_used > datetime.utcnow() - timedelta(seconds=30)
+        assert User.query.filter_by(username='apiuser').one().api_token_last_used > datetime.now() - timedelta(seconds=30)
 
 
 def test_failing_last_used_commit_does_not_break_reads(api, monkeypatch):
     from datetime import datetime, timedelta
     with flask_app.app_context():
         user = User.query.filter_by(username='apiuser').one()
-        user.api_token_last_used = datetime.utcnow() - timedelta(minutes=5)
+        user.api_token_last_used = datetime.now() - timedelta(minutes=5)
         db.session.commit()
     db.session.expire_all()
     real_commit = db.session.commit
@@ -492,3 +492,103 @@ def test_failing_last_used_commit_does_not_break_reads(api, monkeypatch):
     finally:
         monkeypatch.setattr(db.session, 'commit', real_commit)
     assert calls and r.status_code == 200
+
+
+# --- final review fixes ---
+
+@pytest.mark.parametrize('content_type', [None, 'text/plain'])
+def test_json_body_is_parsed_whatever_the_content_type(api, content_type):
+    before = _counts()
+    headers = {'Authorization': f"Bearer {api['token']}"}
+    kwargs = {'content_type': content_type} if content_type else {}
+    r = api['client'].post('/api/v1/actions', data='{"plant_id": %d, "action": "wasser"}' % api['plants']['Kush'],
+                           headers=headers, **kwargs)
+    assert r.status_code == 201, r.get_data(as_text=True)
+    assert _counts()[0] == before[0] + 1
+    for body in ('kein json', '[1, 2]', ''):
+        r = api['client'].post('/api/v1/actions', data=body, headers=headers, **kwargs)
+        assert r.status_code == 422 and r.get_json()['error'] == 'JSON-Objekt erwartet.', body
+
+
+def test_token_use_is_stored_in_local_time(api):
+    from datetime import datetime, timedelta
+    with flask_app.app_context():
+        user = User.query.filter_by(username='apiuser').one()
+        user.api_token_last_used = None
+        db.session.commit()
+    db.session.expire_all()
+    api['call']('GET', '/status')
+    with flask_app.app_context():
+        stamp = User.query.filter_by(username='apiuser').one().api_token_last_used
+    assert abs(datetime.now() - stamp) < timedelta(seconds=30)
+
+
+def test_example_call_on_token_page_direct_port(web):
+    html = web.get('/account/api', environ_base={'REMOTE_ADDR': '192.168.1.50'}).get_data(as_text=True)
+    assert 'http://localhost/api/v1/status' in html
+    assert 'direkten Port' not in html
+
+
+def test_example_call_on_token_page_behind_ingress(web):
+    prefix = '/api/hassio_ingress/TESTTOKEN'
+    html = web.get('/account/api', headers={'X-Ingress-Path': prefix},
+                   environ_base={'REMOTE_ADDR': '172.30.32.2'}).get_data(as_text=True)
+    assert 'http://&lt;home-assistant-ip&gt;:5000/api/v1/status' in html
+    assert 'curl' in html and 'hassio_ingress/TESTTOKEN/api' not in html
+    assert 'direkten Port' in html
+
+
+def _order_of(html, markers):
+    return [m for _, m in sorted((html.index(m), m) for m in markers)]
+
+
+def test_entries_without_time_sort_after_midnight_entries(api):
+    kush = api['plants']['Kush']
+    day = '2031-03-03'
+    for note, clock in (('M2-ohne', None), ('M2-null', '00:00'), ('M2-morgens', '07:30')):
+        body = {'plant_id': kush, 'action': 'wasser', 'date': day, 'notes': note}
+        if clock:
+            body['time'] = clock
+        assert api['call']('POST', '/actions', body).status_code == 201
+    expected = ['M2-morgens', 'M2-null', 'M2-ohne']
+    assert _order_of(api['web'].get('/plant_actions').get_data(as_text=True), expected) == expected
+    assert _order_of(api['web'].get(f'/plant/{kush}').get_data(as_text=True), expected) == expected
+
+
+@pytest.mark.parametrize('clock, expected', [('07:30:45', '07:30:00'), ('23:59:59', '23:59:00'), ('07:30', '07:30:00')])
+def test_time_accepts_seconds_and_drops_them(api, clock, expected):
+    r = api['call']('POST', '/actions', {'plant_id': api['plants']['Kush'], 'action': 'wasser',
+                                          'date': '2031-04-04', 'time': clock, 'notes': 'M3-' + clock})
+    assert r.status_code == 201
+    with flask_app.app_context():
+        log = PlantActionLog.query.filter_by(notes='M3-' + clock).one()
+        assert str(log.time) == expected
+
+
+@pytest.mark.parametrize('clock', ['7:30:45:1', '07:30:61', '24:00:00', '07-30', 'abc', 730, '07:30 '])
+def test_other_time_formats_are_rejected(api, clock):
+    r = api['call']('POST', '/actions', {'plant_id': api['plants']['Kush'], 'action': 'wasser', 'time': clock})
+    assert r.status_code == 422
+
+
+def test_huge_digit_strings_are_not_found(api):
+    huge = '9' * 5000
+    for path, body in (('/actions', {'plant_id': huge, 'action': 'wasser'}),
+                       ('/actions', {'environment_id': huge, 'action': 'wasser'}),
+                       ('/measurements', {'plant_id': huge, 'values': {'ph': 6}}),
+                       ('/environment-logs', {'environment_id': huge, 'values': {'vpd': 1}})):
+        assert api['call']('POST', path, body).status_code == 404, path
+    assert api['call']('POST', '/actions', {'plant_id': '0' * 25 + '1', 'action': 'wasser'}).status_code == 404
+
+
+@pytest.mark.parametrize('body', [{'values': {'vpd': 1}}, {'environment_id': None, 'values': {'vpd': 1}}])
+def test_environment_log_without_environment_id(api, body):
+    r = api['call']('POST', '/environment-logs', body)
+    assert r.status_code == 422
+    assert r.get_json()['error'] == 'environment_id fehlt.'
+
+
+def test_environment_log_malformed_id_keeps_integer_message(api):
+    r = api['call']('POST', '/environment-logs', {'environment_id': 'abc', 'values': {'vpd': 1}})
+    assert r.status_code == 422
+    assert r.get_json()['error'] == 'plant_id und environment_id müssen ganze Zahlen sein.'

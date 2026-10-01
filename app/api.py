@@ -3,7 +3,7 @@ import hashlib
 import math
 import re
 import secrets
-from datetime import date as dt_date, datetime, timedelta, timezone
+from datetime import date as dt_date, datetime, timedelta
 from functools import wraps
 
 from flask import Blueprint, current_app, g, jsonify, request
@@ -74,7 +74,7 @@ def _types(choices):
 def _touch(user):
     """Record token use at most once a minute; a failing write must not break the request."""
     from app import db
-    now = datetime.now(timezone.utc).replace(tzinfo=None)  # the column is naive UTC
+    now = datetime.now()  # naive local time, like the rest of the app
     last = user.api_token_last_used
     if last is not None and now - last < timedelta(seconds=60):
         return
@@ -104,7 +104,7 @@ def token_required(view):
 
 
 def _body():
-    data = request.get_json(silent=True)
+    data = request.get_json(force=True, silent=True)  # whatever the content type
     if not isinstance(data, dict):
         raise ApiError(422, 'JSON-Objekt erwartet.')
     return data
@@ -122,9 +122,14 @@ def _when(data):
         raise ApiError(422, 'Datum muss das Format JJJJ-MM-TT haben.')
     clock = None
     if raw_time is not None and raw_time != '':
-        try:
-            clock = datetime.strptime(raw_time, '%H:%M').time()
-        except (TypeError, ValueError):
+        clock = None
+        for fmt in ('%H:%M', '%H:%M:%S'):
+            try:
+                clock = datetime.strptime(raw_time, fmt).time().replace(second=0)  # seconds are dropped
+                break
+            except (TypeError, ValueError):
+                continue
+        if clock is None:
             raise ApiError(422, 'Uhrzeit muss das Format HH:MM haben.')
     if raw_notes is not None and not isinstance(raw_notes, str):
         raise ApiError(422, 'Notiz muss Text sein.')
@@ -137,6 +142,8 @@ MAX_ID = 2 ** 63 - 1
 def _id(value):
     """Integer id from an int or a string of decimal digits; None if out of database range."""
     if isinstance(value, str) and re.fullmatch(r'[0-9]+', value):
+        if len(value) > 19:  # beyond the database range; do not even convert it
+            return None
         value = int(value)
     if isinstance(value, bool) or not isinstance(value, int):
         raise ApiError(422, 'plant_id und environment_id müssen ganze Zahlen sein.')
@@ -295,6 +302,8 @@ def create_environment_log():
     from app.forms import ENV_MEASUREMENT_TYPES
     from app.models import EnvironmentLog
     data = _body()
+    if data.get('environment_id') is None:
+        raise ApiError(422, 'environment_id fehlt.')
     env = _environment(data.get('environment_id'))
     day, clock, notes = _when(data)
     log = EnvironmentLog(environment_id=env.id, date=day, time=clock, notes=notes)
