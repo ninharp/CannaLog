@@ -99,7 +99,13 @@ def api(web):
         headers = {'Authorization': f'Bearer {token_value}'} if token_value else {}
         return client.open(f'/api/v1{path}', method=method, json=json, headers=headers)
 
-    return {'call': call, 'env': env, 'empty': empty, 'plants': plants}
+    def raw(method, path, body, token_value=token):
+        headers = {'Authorization': f'Bearer {token_value}'}
+        return client.open(f'/api/v1{path}', method=method, data=body,
+                           content_type='application/json', headers=headers)
+
+    return {'call': call, 'raw': raw, 'client': client, 'token': token,
+            'env': env, 'empty': empty, 'plants': plants}
 
 
 def test_status(api):
@@ -203,7 +209,8 @@ def test_body_must_be_json_object(api):
     assert r.status_code == 422
 
 
-def test_foreign_and_unknown_ids_are_not_found(api, web):
+@pytest.fixture(scope='module')
+def foreign(api):
     with flask_app.app_context():
         from werkzeug.security import generate_password_hash
         other = User(username='fremd', password=generate_password_hash('geheim123'))
@@ -215,9 +222,12 @@ def test_foreign_and_unknown_ids_are_not_found(api, web):
         plant = Plant(pflanzenname='Fremdpflanze', user_id=other.id, environment_id=env.id)
         db.session.add(plant)
         db.session.commit()
-        foreign_env, foreign_plant = env.id, plant.id
-    assert api['call']('POST', '/actions', {'environment_id': foreign_env, 'action': 'wasser'}).status_code == 404
-    assert api['call']('POST', '/actions', {'plant_id': foreign_plant, 'action': 'wasser'}).status_code == 404
+        return {'env': env.id, 'plant': plant.id}
+
+
+def test_foreign_and_unknown_ids_are_not_found(api, foreign):
+    assert api['call']('POST', '/actions', {'environment_id': foreign['env'], 'action': 'wasser'}).status_code == 404
+    assert api['call']('POST', '/actions', {'plant_id': foreign['plant'], 'action': 'wasser'}).status_code == 404
     assert api['call']('POST', '/actions', {'plant_id': 99999, 'action': 'wasser'}).status_code == 404
     names = [e['name'] for e in api['call']('GET', '/environments').get_json()]
     assert 'Fremd' not in names
@@ -227,3 +237,258 @@ def test_token_use_is_recorded(api):
     api['call']('GET', '/status')
     with flask_app.app_context():
         assert User.query.filter_by(username='apiuser').first().api_token_last_used is not None
+
+
+# --- hardening (fix round 1) ---
+
+def _counts():
+    from app.models import Measurement
+    with flask_app.app_context():
+        return (PlantActionLog.query.count(), PlantLog.query.count(), Measurement.query.count(),
+                EnvironmentLog.query.count())
+
+
+@pytest.mark.parametrize('action', [[], {}, 5, None, True])
+def test_non_string_action_is_rejected(api, action):
+    r = api['call']('POST', '/actions', {'environment_id': api['env'], 'action': action})
+    assert r.status_code == 422
+    assert r.get_json()['error'] == 'Unbekannte Aktion.'
+
+
+@pytest.mark.parametrize('literal', ['NaN', 'Infinity', '-Infinity', '1e999', '1' + '0' * 400])
+def test_non_finite_and_overflowing_numbers_are_rejected(api, literal):
+    before = _counts()
+    body = '{"environment_id": %d, "values": {"ph": %s}}' % (api['env'], literal)
+    r = api['raw']('POST', '/measurements', body)
+    assert r.status_code == 422, r.get_data(as_text=True)
+    assert r.get_json()['error'] == 'Messwerte müssen Zahlen sein.'
+    body = '{"environment_id": %d, "values": {"vpd": {"max": %s}}}' % (api['env'], literal)
+    assert api['raw']('POST', '/environment-logs', body).status_code == 422
+    assert _counts() == before
+
+
+def test_huge_ids_are_not_found(api):
+    assert api['call']('POST', '/actions', {'plant_id': 2 ** 70, 'action': 'wasser'}).status_code == 404
+    assert api['call']('POST', '/actions', {'environment_id': 2 ** 70, 'action': 'wasser'}).status_code == 404
+    assert api['call']('POST', '/environment-logs', {'environment_id': 2 ** 70, 'values': {'vpd': 1}}).status_code == 404
+    assert api['call']('POST', '/actions', {'plant_id': str(2 ** 70), 'action': 'wasser'}).status_code == 404
+
+
+def test_ids_may_be_digit_strings(api):
+    r = api['call']('POST', '/actions', {'environment_id': str(api['env']), 'action': 'spuelen'})
+    assert r.status_code == 201 and r.get_json()['created'] == 2
+    r = api['call']('POST', '/actions', {'plant_id': str(api['plants']['Kush']), 'action': 'ernte'})
+    assert r.status_code == 201 and r.get_json() == {'created': 1, 'plants': ['Kush']}
+    r = api['call']('POST', '/environment-logs', {'environment_id': str(api['env']), 'values': {'vpd': 1.0}})
+    assert r.status_code == 201
+
+
+@pytest.mark.parametrize('bad', [1.5, True, [1], {'a': 1}, 'abc', '1.5', '-1', ' 1', ''])
+@pytest.mark.parametrize('key', ['plant_id', 'environment_id'])
+def test_malformed_ids_are_rejected(api, key, bad):
+    r = api['call']('POST', '/actions', {key: bad, 'action': 'wasser'})
+    assert r.status_code == 422
+    assert r.get_json()['error'] == 'plant_id und environment_id müssen ganze Zahlen sein.'
+
+
+def test_exactly_one_target_is_checked_first(api):
+    r = api['call']('POST', '/actions', {'plant_id': 1.5, 'environment_id': 1, 'action': 'wasser'})
+    assert r.status_code == 422
+    assert 'Genau eines' in r.get_json()['error']
+
+
+def test_unknown_api_path_is_json_404(api):
+    r = api['call']('GET', '/foo')
+    assert r.status_code == 404 and r.is_json
+    assert r.get_json() == {'error': 'Nicht gefunden.'}
+    r = api['client'].get('/api/v1/foo')  # without a token as well
+    assert r.status_code == 404 and r.is_json
+
+
+def test_wrong_method_is_json_405(api):
+    r = api['call']('POST', '/status')
+    assert r.status_code == 405 and r.is_json
+    assert r.get_json() == {'error': 'Methode nicht erlaubt.'}
+
+
+def test_oversized_body_is_json_413(api):
+    old = flask_app.config['MAX_CONTENT_LENGTH']
+    flask_app.config['MAX_CONTENT_LENGTH'] = 100
+    try:
+        r = api['raw']('POST', '/actions', '{"notes": "' + 'x' * 500 + '"}')
+    finally:
+        flask_app.config['MAX_CONTENT_LENGTH'] = old
+    assert r.status_code == 413 and r.is_json
+    assert r.get_json()['error']
+
+
+def test_unexpected_exception_is_json_500(api, monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError('kaputt')
+    monkeypatch.setattr('app.api._target_plants', boom)
+    flask_app.config['PROPAGATE_EXCEPTIONS'] = False
+    try:
+        r = api['call']('POST', '/actions', {'environment_id': api['env'], 'action': 'wasser'})
+    finally:
+        flask_app.config['PROPAGATE_EXCEPTIONS'] = None
+    assert r.status_code == 500 and r.get_json() == {'error': 'Interner Fehler.'}
+
+
+def test_web_ui_errors_stay_html(api):
+    r = api['client'].get('/gibt-es-nicht')
+    assert r.status_code == 404
+    assert not r.is_json and b'<' in r.data
+    # a path that merely starts with the same letters is not part of the API
+    assert not api['client'].get('/api/v10/x').is_json
+
+
+def test_rejected_multi_plant_request_persists_nothing(api):
+    before = _counts()
+    r = api['call']('POST', '/measurements', {'environment_id': api['env'],
+                                               'values': {'ph': 6.0, 'ec': 'viel'}})
+    assert r.status_code == 422
+    r = api['call']('POST', '/measurements', {'environment_id': api['env'], 'time': '99:00',
+                                               'values': {'ph': 6.0}})
+    assert r.status_code == 422
+    assert _counts() == before
+
+
+def test_foreign_environment_on_logs_is_not_found(api, foreign):
+    before = _counts()
+    assert api['call']('POST', '/measurements', {'environment_id': foreign['env'],
+                                                  'values': {'ph': 6}}).status_code == 404
+    assert api['call']('POST', '/environment-logs', {'environment_id': foreign['env'],
+                                                      'values': {'vpd': 1}}).status_code == 404
+    assert _counts() == before
+
+
+def test_environment_only_uses_own_plants(api, foreign):
+    """A foreign plant stuck in the user's environment must not be written to."""
+    with flask_app.app_context():
+        stray = Plant(pflanzenname='Streuner', user_id=User.query.filter_by(username='fremd').one().id,
+                      environment_id=api['env'])
+        db.session.add(stray)
+        db.session.commit()
+        stray_id = stray.id
+    try:
+        r = api['call']('POST', '/actions', {'environment_id': api['env'], 'action': 'sonstiges'})
+        assert r.status_code == 201
+        assert sorted(r.get_json()['plants']) == ['Amnesia', 'Kush']
+        with flask_app.app_context():
+            assert PlantActionLog.query.filter_by(plant_id=stray_id).count() == 0
+    finally:
+        with flask_app.app_context():
+            db.session.delete(db.session.get(Plant, stray_id))
+            db.session.commit()
+
+
+def test_latest_values_prefer_newest_date_then_time_then_creation(api, web):
+    from app.models import Measurement
+    web.post('/environment/add', data={'name': 'Latest', 'exposure_time': '18', 'length': '80',
+                                       'width': '80', 'height': '160'})
+    with flask_app.app_context():
+        env = Environment.query.filter_by(name='Latest').one().id
+    web.post('/plant/add', data={'pflanzenname': 'Eins', 'date': '2026-08-20', 'count': '1',
+                                 'medium_type': 'erde', 'phase': 'Wachstum', 'environment_id': str(env)})
+    web.post('/plant/add', data={'pflanzenname': 'Zwei', 'date': '2026-08-20', 'count': '1',
+                                 'medium_type': 'erde', 'phase': 'Wachstum', 'environment_id': str(env)})
+    from datetime import time as dt_time
+    with flask_app.app_context():
+        one, two = [p.id for p in Plant.query.filter_by(environment_id=env).order_by(Plant.id)]
+
+        def add(plant, day, clock, kind, value):
+            log = PlantLog(plant_id=plant, date=day, time=clock)
+            log.measurements = [Measurement(type=kind, value=value)]
+            db.session.add(log)
+            db.session.commit()
+
+        # same day: the entry with a time beats the one without, even if created later
+        add(one, date(2026, 11, 1), dt_time(7, 0), 'ph', 6.0)
+        add(two, date(2026, 11, 1), None, 'ph', 5.0)
+        add(one, date(2026, 10, 31), dt_time(23, 0), 'ph', 4.0)   # older day never wins
+        # same date and time: the later-created one wins
+        add(one, date(2026, 11, 2), dt_time(8, 0), 'ec', 1.0)
+        add(two, date(2026, 11, 2), dt_time(8, 0), 'ec', 2.0)
+        # NULL values are ignored
+        log = PlantLog(plant_id=one, date=date(2026, 12, 1))
+        log.measurements = [Measurement(type='ec', value=None, min_value=1.0)]
+        db.session.add(log)
+        db.session.commit()
+    latest = next(e for e in api['call']('GET', '/environments').get_json() if e['id'] == env)['latest']
+    assert latest['ph'] == {'value': 6.0, 'date': '2026-11-01', 'time': '07:00'}
+    assert latest['ec'] == {'value': 2.0, 'date': '2026-11-02', 'time': '08:00'}
+
+
+def test_untimed_entry_wins_on_a_newer_day(api):
+    from app.models import Measurement
+    with flask_app.app_context():
+        env = Environment.query.filter_by(name='Latest').one().id
+        plant = Plant.query.filter_by(environment_id=env).first().id
+        log = PlantLog(plant_id=plant, date=date(2026, 11, 3))
+        log.measurements = [Measurement(type='ph', value=7.0)]
+        db.session.add(log)
+        db.session.commit()
+    latest = next(e for e in api['call']('GET', '/environments').get_json() if e['id'] == env)['latest']
+    assert latest['ph'] == {'value': 7.0, 'date': '2026-11-03', 'time': None}
+
+
+def test_scheme_is_case_insensitive(api):
+    r = api['client'].get('/api/v1/status', headers={'Authorization': f"bearer {api['token']}"})
+    assert r.status_code == 200
+    r = api['client'].get('/api/v1/status', headers={'Authorization': f"Basic {api['token']}"})
+    assert r.status_code == 401
+
+
+def test_empty_strings_mean_absent_and_falsy_values_are_rejected(api):
+    r = api['call']('POST', '/actions', {'plant_id': api['plants']['Kush'], 'action': 'wasser',
+                                          'time': '', 'notes': ''})
+    assert r.status_code == 201
+    r = api['call']('POST', '/actions', {'plant_id': api['plants']['Kush'], 'action': 'wasser',
+                                          'time': None, 'notes': None, 'date': None})
+    assert r.status_code == 201
+    for field, value in [('time', False), ('time', 0), ('notes', 0), ('notes', []), ('date', 0),
+                         ('date', ''), ('date', False)]:
+        r = api['call']('POST', '/actions', {'plant_id': api['plants']['Kush'], 'action': 'wasser',
+                                              field: value})
+        assert r.status_code == 422, (field, value)
+
+
+def test_token_use_is_written_at_most_once_a_minute(api):
+    from datetime import datetime, timedelta
+    with flask_app.app_context():
+        user = User.query.filter_by(username='apiuser').one()
+        user.api_token_last_used = datetime.utcnow() - timedelta(seconds=10)
+        stamp = user.api_token_last_used
+        db.session.commit()
+    db.session.expire_all()  # requests share the fixture's app context and its session
+    api['call']('GET', '/status')
+    with flask_app.app_context():
+        assert User.query.filter_by(username='apiuser').one().api_token_last_used == stamp
+        user = User.query.filter_by(username='apiuser').one()
+        user.api_token_last_used = datetime.utcnow() - timedelta(minutes=5)
+        db.session.commit()
+    db.session.expire_all()
+    api['call']('GET', '/status')
+    with flask_app.app_context():
+        assert User.query.filter_by(username='apiuser').one().api_token_last_used > datetime.utcnow() - timedelta(seconds=30)
+
+
+def test_failing_last_used_commit_does_not_break_reads(api, monkeypatch):
+    from datetime import datetime, timedelta
+    with flask_app.app_context():
+        user = User.query.filter_by(username='apiuser').one()
+        user.api_token_last_used = datetime.utcnow() - timedelta(minutes=5)
+        db.session.commit()
+    db.session.expire_all()
+    real_commit = db.session.commit
+    calls = []
+
+    def failing_commit():
+        calls.append(1)
+        raise RuntimeError('database is locked')
+    monkeypatch.setattr(db.session, 'commit', failing_commit)
+    try:
+        r = api['call']('GET', '/status')
+    finally:
+        monkeypatch.setattr(db.session, 'commit', real_commit)
+    assert calls and r.status_code == 200

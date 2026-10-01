@@ -1,10 +1,13 @@
 """Token-authenticated JSON API for automation (Home Assistant, panels)."""
 import hashlib
+import math
+import re
 import secrets
-from datetime import date as dt_date, datetime, time as dt_time
+from datetime import date as dt_date, datetime, timedelta, timezone
 from functools import wraps
 
-from flask import Blueprint, g, jsonify, request
+from flask import Blueprint, current_app, g, jsonify, request
+from werkzeug.exceptions import HTTPException
 
 
 def hash_token(token):
@@ -32,8 +35,55 @@ def handle_api_error(error):
     return jsonify(error=error.message), error.status
 
 
+API_PREFIX = '/api/v1/'
+HTTP_MESSAGES = {
+    400: 'Ungültige Anfrage.',
+    401: 'Nicht angemeldet.',
+    403: 'Zugriff verweigert.',
+    404: 'Nicht gefunden.',
+    405: 'Methode nicht erlaubt.',
+    408: 'Zeitüberschreitung.',
+    413: 'Anfrage zu groß.',
+    415: 'Nicht unterstützter Inhaltstyp.',
+    429: 'Zu viele Anfragen.',
+    500: 'Interner Fehler.',
+}
+
+
+@api.app_errorhandler(HTTPException)
+def handle_http_error(error):
+    """JSON errors for everything below /api/v1/ (also unmatched URLs); the web UI keeps its pages."""
+    if not request.path.startswith(API_PREFIX):
+        return error
+    from app import db
+    code = error.code or 500
+    if code >= 500:
+        db.session.rollback()  # Flask has already logged the traceback via app.logger
+    response = jsonify(error=HTTP_MESSAGES.get(code, 'Fehler bei der Anfrage.'))
+    response.status_code = code
+    allowed = getattr(error, 'valid_methods', None)
+    if allowed:
+        response.headers['Allow'] = ', '.join(allowed)
+    return response
+
+
 def _types(choices):
     return {key for key, _ in choices if key}
+
+
+def _touch(user):
+    """Record token use at most once a minute; a failing write must not break the request."""
+    from app import db
+    now = datetime.now(timezone.utc).replace(tzinfo=None)  # the column is naive UTC
+    last = user.api_token_last_used
+    if last is not None and now - last < timedelta(seconds=60):
+        return
+    try:
+        user.api_token_last_used = now
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.warning('Could not record API token use', exc_info=True)
 
 
 def token_required(view):
@@ -41,14 +91,13 @@ def token_required(view):
     def wrapped(*args, **kwargs):
         from app import db
         from app.models import User
-        header = request.headers.get('Authorization', '')
-        if not header.startswith('Bearer '):
+        scheme, _, token = request.headers.get('Authorization', '').partition(' ')
+        if scheme.lower() != 'bearer' or not token.strip():
             raise ApiError(401, 'Token fehlt.')
-        user = User.query.filter_by(api_token_hash=hash_token(header[7:].strip())).first()
+        user = User.query.filter_by(api_token_hash=hash_token(token.strip())).first()
         if user is None:
             raise ApiError(401, 'Token ungültig.')
-        user.api_token_last_used = datetime.utcnow()
-        db.session.commit()
+        _touch(user)
         g.api_user = user
         return view(*args, **kwargs)
     return wrapped
@@ -62,28 +111,48 @@ def _body():
 
 
 def _when(data):
-    """(date, time, notes) from the common fields; date defaults to today."""
-    raw_date, raw_time = data.get('date'), data.get('time')
+    """(date, time, notes) from the common fields; date defaults to today.
+
+    Only a missing key or null means "absent"; for time and notes an empty string does too.
+    """
+    raw_date, raw_time, raw_notes = data.get('date'), data.get('time'), data.get('notes')
     try:
-        day = dt_date.fromisoformat(raw_date) if raw_date else dt_date.today()
+        day = dt_date.today() if raw_date is None else dt_date.fromisoformat(raw_date)
     except (TypeError, ValueError):
         raise ApiError(422, 'Datum muss das Format JJJJ-MM-TT haben.')
     clock = None
-    if raw_time:
+    if raw_time is not None and raw_time != '':
         try:
             clock = datetime.strptime(raw_time, '%H:%M').time()
         except (TypeError, ValueError):
             raise ApiError(422, 'Uhrzeit muss das Format HH:MM haben.')
-    notes = data.get('notes') or None
-    if notes is not None and not isinstance(notes, str):
+    if raw_notes is not None and not isinstance(raw_notes, str):
         raise ApiError(422, 'Notiz muss Text sein.')
-    return day, clock, notes
+    return day, clock, raw_notes or None
+
+
+MAX_ID = 2 ** 63 - 1
+
+
+def _id(value):
+    """Integer id from an int or a string of decimal digits; None if out of database range."""
+    if isinstance(value, str) and re.fullmatch(r'[0-9]+', value):
+        value = int(value)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ApiError(422, 'plant_id und environment_id müssen ganze Zahlen sein.')
+    return value if 0 <= value <= MAX_ID else None
+
+
+def _own_plants(env):
+    from app.models import Plant
+    return Plant.query.filter_by(environment_id=env.id, user_id=g.api_user.id).order_by(Plant.id).all()
 
 
 def _environment(env_id):
     from app.models import Environment
+    env_id = _id(env_id)
     env = None
-    if isinstance(env_id, int) and not isinstance(env_id, bool):
+    if env_id is not None:
         env = Environment.query.filter_by(id=env_id, user_id=g.api_user.id).first()
     if env is None:
         raise ApiError(404, 'Umgebung nicht gefunden.')
@@ -97,13 +166,14 @@ def _target_plants(data):
     if (plant_id is None) == (env_id is None):
         raise ApiError(422, 'Genau eines von plant_id oder environment_id angeben.')
     if plant_id is not None:
+        plant_id = _id(plant_id)
         plant = None
-        if isinstance(plant_id, int) and not isinstance(plant_id, bool):
+        if plant_id is not None:
             plant = Plant.query.filter_by(id=plant_id, user_id=g.api_user.id).first()
         if plant is None:
             raise ApiError(404, 'Pflanze nicht gefunden.')
         return [plant]
-    plants = list(_environment(env_id).plants)
+    plants = _own_plants(_environment(env_id))
     if not plants:
         raise ApiError(422, 'Keine Pflanzen in dieser Umgebung.')
     return plants
@@ -112,7 +182,13 @@ def _target_plants(data):
 def _number(value):
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ApiError(422, 'Messwerte müssen Zahlen sein.')
-    return float(value)
+    try:
+        number = float(value)
+    except OverflowError:
+        raise ApiError(422, 'Messwerte müssen Zahlen sein.')
+    if not math.isfinite(number):  # NaN and Infinity are accepted by Python's JSON parser
+        raise ApiError(422, 'Messwerte müssen Zahlen sein.')
+    return number
 
 
 def _measurements(values, allowed, ranges=False):
@@ -135,21 +211,22 @@ def _measurements(values, allowed, ranges=False):
     return rows
 
 
-def _latest(plants, kind):
-    best = None
-    for plant in plants:
-        for log in plant.logs:
-            for m in log.measurements:
-                if m.type != kind or m.value is None:
-                    continue
-                key = (log.date, log.time or dt_time.min)
-                if best is None or key > best[0]:
-                    best = (key, m.value, log)
-    if best is None:
+def _latest(env, kind):
+    """Newest non-null value of a plant measurement type in an environment (one bounded query)."""
+    from app import db
+    from app.models import Measurement, Plant, PlantLog
+    row = (db.session.query(Measurement.value, PlantLog.date, PlantLog.time)
+           .join(PlantLog, Measurement.plant_log_id == PlantLog.id)
+           .join(Plant, PlantLog.plant_id == Plant.id)
+           .filter(Plant.environment_id == env.id, Plant.user_id == g.api_user.id,
+                   Measurement.type == kind, Measurement.value.isnot(None))
+           # entries without a time sort after timed ones of the same day; the log id breaks ties
+           .order_by(PlantLog.date.desc(), PlantLog.time.is_(None), PlantLog.time.desc(), PlantLog.id.desc())
+           .first())
+    if row is None:
         return None
-    _, value, log = best
-    return {'value': value, 'date': log.date.isoformat(),
-            'time': log.time.strftime('%H:%M') if log.time else None}
+    value, day, clock = row
+    return {'value': value, 'date': day.isoformat(), 'time': clock.strftime('%H:%M') if clock else None}
 
 
 @api.route('/status')
@@ -165,12 +242,12 @@ def environments():
     from app.models import Environment
     result = []
     for env in Environment.query.filter_by(user_id=g.api_user.id).order_by(Environment.id):
-        plants = list(env.plants)
+        plants = _own_plants(env)
         result.append({
             'id': env.id,
             'name': env.name,
             'plants': [{'id': p.id, 'name': p.pflanzenname, 'phase': p.phase} for p in plants],
-            'latest': {kind: _latest(plants, kind) for kind in ('ph', 'ec')},
+            'latest': {kind: _latest(env, kind) for kind in ('ph', 'ec')},
         })
     return jsonify(result)
 
@@ -184,7 +261,7 @@ def create_actions():
     data = _body()
     plants = _target_plants(data)
     action = data.get('action')
-    if action not in _types(PLANT_ACTIONS):
+    if not isinstance(action, str) or action not in _types(PLANT_ACTIONS):
         raise ApiError(422, 'Unbekannte Aktion.')
     day, clock, notes = _when(data)
     for plant in plants:
