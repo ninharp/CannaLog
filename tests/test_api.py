@@ -594,15 +594,40 @@ def test_environment_log_malformed_id_keeps_integer_message(api):
     assert r.get_json()['error'] == 'plant_id und environment_id müssen ganze Zahlen sein.'
 
 
-@pytest.fixture(autouse=True)
-def _no_entries_for_recent_tests(request):
-    """The api fixture is module-scoped; the recent tests count entries and need none left over."""
-    if request.node.name.startswith('test_recent') and 'api' in request.fixturenames:
-        with flask_app.app_context():
-            PlantActionLog.query.delete()
-            PlantLog.query.delete()
+@pytest.fixture
+def tent(api):
+    """A fresh environment with two plants swapped into the shared api fixture for one test.
+
+    Entries from earlier tests of this module therefore cannot show up in the recent lists.
+    """
+    from app.models import Measurement
+    saved = (api['env'], api['plants'])
+    with flask_app.app_context():
+        user = User.query.filter_by(username='apiuser').one()
+        env = Environment(name='Recent', user_id=user.id)
+        db.session.add(env)
+        db.session.commit()
+        plants = {}
+        for name in ('Amnesia', 'Kush'):
+            plant = Plant(pflanzenname=name, user_id=user.id, environment_id=env.id)
+            db.session.add(plant)
             db.session.commit()
-    yield
+            plants[name] = plant.id
+        env_id = env.id
+    api['env'], api['plants'] = env_id, plants
+    try:
+        yield api
+    finally:
+        api['env'], api['plants'] = saved
+        with flask_app.app_context():
+            ids = [p.id for p in Plant.query.filter_by(environment_id=env_id)]
+            for log in PlantLog.query.filter(PlantLog.plant_id.in_(ids)):
+                db.session.delete(log)  # cascades to the measurements
+            PlantActionLog.query.filter(PlantActionLog.plant_id.in_(ids)).delete(synchronize_session=False)
+            Plant.query.filter(Plant.id.in_(ids)).delete(synchronize_session=False)
+            db.session.delete(db.session.get(Environment, env_id))
+            db.session.commit()
+    del Measurement
 
 
 def _recent(api, n=10, env_key='env'):
@@ -617,7 +642,7 @@ def test_environments_without_recent_is_unchanged(api):
     assert all('recent' not in e for e in envs0)
 
 
-def test_recent_groups_entries_for_all_plants(api):
+def test_recent_groups_entries_for_all_plants(api, tent):
     api['call']('POST', '/actions', {'environment_id': api['env'], 'action': 'wasser',
                                      'date': '2026-10-01', 'time': '18:09', 'notes': 'automatisch'})
     items = _recent(api)
@@ -626,7 +651,7 @@ def test_recent_groups_entries_for_all_plants(api):
                       'notes': 'automatisch'}]
 
 
-def test_recent_single_plant_and_measurement(api):
+def test_recent_single_plant_and_measurement(api, tent):
     api['call']('POST', '/actions', {'plant_id': api['plants']['Kush'], 'action': 'training',
                                      'date': '2026-10-01', 'time': '09:00'})
     api['call']('POST', '/measurements', {'environment_id': api['env'], 'date': '2026-10-01',
@@ -639,7 +664,7 @@ def test_recent_single_plant_and_measurement(api):
     assert items[1]['label'] == 'Training'
 
 
-def test_recent_order_and_limit(api):
+def test_recent_order_and_limit(api, tent):
     for day, clock in (('2026-09-30', '08:00'), ('2026-10-01', None), ('2026-10-01', '07:00'),
                        ('2026-10-01', '12:00')):
         body = {'environment_id': api['env'], 'action': 'wasser', 'date': day}
@@ -652,7 +677,7 @@ def test_recent_order_and_limit(api):
     assert len(_recent(api, 2)) == 2
 
 
-def test_recent_different_notes_are_not_grouped(api):
+def test_recent_different_notes_are_not_grouped(api, tent):
     for name, note in (('Amnesia', 'a'), ('Kush', 'b')):
         api['call']('POST', '/actions', {'plant_id': api['plants'][name], 'action': 'wasser',
                                          'date': '2026-10-01', 'time': '08:00', 'notes': note})
@@ -670,7 +695,7 @@ def test_recent_rejects_invalid_values(api, bad):
     assert 'error' in r.get_json()
 
 
-def test_recent_never_contains_foreign_plants(api, foreign):
+def test_recent_never_contains_foreign_plants(api, tent, foreign):
     with flask_app.app_context():
         stray = Plant(pflanzenname='Streuner', user_id=User.query.filter_by(username='fremd').one().id,
                       environment_id=api['env'])
@@ -690,3 +715,120 @@ def test_recent_never_contains_foreign_plants(api, foreign):
             PlantActionLog.query.filter_by(plant_id=stray_id).delete()
             db.session.delete(db.session.get(Plant, stray_id))
             db.session.commit()
+
+
+def _plant_log(plant_id, day, clock, values=(), notes=None):
+    """Insert a PlantLog directly; values is a list of (type, value, min, max)."""
+    from app.models import Measurement
+    with flask_app.app_context():
+        log = PlantLog(plant_id=plant_id, date=day, time=clock, notes=notes)
+        log.measurements = [Measurement(type=t, value=v, min_value=lo, max_value=hi)
+                            for t, v, lo, hi in values]
+        db.session.add(log)
+        db.session.commit()
+
+
+def _action(plant_id, day, clock, action='wasser', notes=None):
+    with flask_app.app_context():
+        db.session.add(PlantActionLog(plant_id=plant_id, date=day, time=clock, action=action, notes=notes))
+        db.session.commit()
+
+
+def _extra_plants(api, *names):
+    with flask_app.app_context():
+        user = User.query.filter_by(username='apiuser').one()
+        for name in names:
+            plant = Plant(pflanzenname=name, user_id=user.id, environment_id=api['env'])
+            db.session.add(plant)
+            db.session.commit()
+            api['plants'][name] = plant.id  # removed together with the tent
+
+
+def test_recent_group_is_complete_when_other_rows_interleave(api, tent):
+    from datetime import time
+    _extra_plants(api, 'Cheese')
+    day, at = date(2026, 10, 1), time(8, 0)
+    pid = api['plants']
+    _action(pid['Amnesia'], day, at, notes='x')
+    for note in ('n0', 'n1', 'n2'):
+        _action(pid['Kush'], day, at, notes=note)
+    _action(pid['Kush'], day, at, notes='x')
+    _action(pid['Cheese'], day, at, notes='x')
+    items = _recent(api, 1)
+    assert len(items) == 1
+    # the newest row belongs to the "x" group, which spans all three plants
+    assert items[0]['notes'] == 'x'
+    assert items[0]['plants'] == ['Amnesia', 'Cheese', 'Kush'] and items[0]['all'] is True
+
+
+def test_recent_mixed_sources_are_ordered_by_time(api, tent):
+    from datetime import time
+    day, pid = date(2026, 10, 1), api['plants']
+    _action(pid['Kush'], day, time(9, 0), 'training')
+    _plant_log(pid['Kush'], day, time(10, 0), [('ph', 6.0, None, None)])
+    _action(pid['Kush'], day, time(11, 0), 'wasser')
+    _plant_log(pid['Kush'], day, None, [('ec', 1.0, None, None)])
+    items = _recent(api)
+    assert [(i['type'], i['time']) for i in items] == [
+        ('action', '11:00'), ('measurement', '10:00'), ('action', '09:00'), ('measurement', None)]
+
+
+def test_recent_none_and_empty_notes_group_together(api, tent):
+    from datetime import time
+    day, pid = date(2026, 10, 1), api['plants']
+    _action(pid['Amnesia'], day, time(8, 0), notes=None)
+    _action(pid['Kush'], day, time(8, 0), notes='')
+    items = _recent(api)
+    assert len(items) == 1 and items[0]['all'] is True and items[0]['notes'] is None
+
+
+def test_recent_different_values_are_not_grouped(api, tent):
+    from datetime import time
+    day, pid = date(2026, 10, 1), api['plants']
+    _plant_log(pid['Amnesia'], day, time(8, 0), [('ph', 6.0, None, None)])
+    _plant_log(pid['Kush'], day, time(8, 0), [('ph', 6.5, None, None)])
+    items = _recent(api)
+    assert sorted(i['values']['ph'] for i in items) == [6.0, 6.5]
+    assert all(i['all'] is False for i in items)
+
+
+def test_recent_valueless_logs_are_skipped_without_reducing_the_count(api, tent):
+    from datetime import time
+    day, pid = date(2026, 10, 1), api['plants']
+    _plant_log(pid['Amnesia'], day, time(23, 0), [], notes='nur Notiz')
+    _plant_log(pid['Amnesia'], day, time(22, 0), [('ph', None, 5.5, 6.5)])
+    _plant_log(pid['Kush'], day, time(21, 0), [('ph', None, None, None)], notes='leer')
+    _action(pid['Kush'], date(2026, 9, 1), time(8, 0))
+    _plant_log(pid['Kush'], date(2026, 9, 2), time(8, 0), [('ph', 6.0, None, None)])
+    items = _recent(api, 2)
+    assert [(i['type'], i['date']) for i in items] == [('measurement', '2026-09-02'), ('action', '2026-09-01')]
+
+
+def test_recent_minute_resolution_groups_and_orders(api, tent):
+    from datetime import time
+    day, pid = date(2026, 10, 1), api['plants']
+    _action(pid['Amnesia'], day, time(8, 0, 10))
+    _action(pid['Kush'], day, time(8, 0, 40))
+    _action(pid['Kush'], day, time(7, 59, 0), 'training')
+    items = _recent(api, 2)
+    assert [(i['time'], i['action'], i['all']) for i in items] == [('08:00', 'wasser', True), ('07:59', 'training', False)]
+
+
+def test_recent_never_contains_foreign_measurements(api, tent, foreign):
+    from datetime import time
+    day = date(2026, 10, 1)
+    _plant_log(foreign['plant'], day, time(12, 0), [('ph', 7.0, None, None)])
+    _plant_log(api['plants']['Kush'], day, time(8, 0), [('ph', 6.0, None, None)])
+    items = _recent(api)
+    assert [i['values'] for i in items] == [{'ph': 6.0}]
+    assert _recent(api, env_key='empty') == []
+
+
+@pytest.mark.parametrize('padded', ['0050', '007', '00'])
+def test_recent_accepts_zero_padded_integers(api, padded):
+    assert api['call']('GET', f'/environments?recent={padded}').status_code == 200
+
+
+@pytest.mark.parametrize('bad', ['+5', '0051', '٥', '5 '])
+def test_recent_rejects_signs_and_non_ascii_digits(api, bad):
+    assert api['call']('GET', f'/environments?recent={bad}').status_code == 422

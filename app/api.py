@@ -236,26 +236,64 @@ def _latest(env, kind):
     return {'value': value, 'date': day.isoformat(), 'time': clock.strftime('%H:%M') if clock else None}
 
 
+def _minute(clock):
+    """Time of day truncated to the minute (the resolution shown and grouped on); None stays None."""
+    return clock.replace(second=0, microsecond=0) if clock else None
+
+
 def _recent(env, limit):
     """Newest journal entries (actions and measurements) of the user's plants in an environment.
 
-    Entries of several plants that are identical in kind, date, time, content and notes
-    are merged into one item.
+    Entries of several plants that are identical in kind, date, minute, content and notes
+    are merged into one item. Per source the newest `limit` distinct moments are selected in SQL
+    and all rows of the own plants at those moments are loaded, so every group is complete and
+    `limit` items come back whenever that many exist.
     """
+    from app import db
     from app.forms import PLANT_ACTIONS
-    from app.models import PlantActionLog, PlantLog
+    from app.models import Measurement, PlantActionLog, PlantLog
+    from sqlalchemy import and_, or_
+    from sqlalchemy.orm import selectinload
     plants = _own_plants(env)
     if not plants:
         return []
     names = {p.id: p.pflanzenname for p in plants}
     labels = dict(PLANT_ACTIONS)
-    # each source can contribute at most `limit` groups, and a group spans at most len(plants) rows
-    rows_max = limit * len(plants) + limit
 
-    def newest(model):
-        return (model.query.filter(model.plant_id.in_(list(names)))
-                .order_by(model.date.desc(), model.time.is_(None), model.time.desc(), model.id.desc())
-                .limit(rows_max).all())
+    def newest(model, usable=None):
+        base = [model.plant_id.in_(list(names))]
+        if usable is not None:
+            base.append(usable)
+        size = limit
+        while True:
+            moments = (db.session.query(model.date, model.time).filter(*base)
+                       .group_by(model.date, model.time)
+                       .order_by(model.date.desc(), model.time.is_(None), model.time.desc())
+                       .limit(size).all())
+            # rows seconds apart share a minute (one item), so ask for more moments until
+            # `limit` distinct minutes are covered or nothing older is left
+            if len({(d, _minute(t)) for d, t in moments}) >= limit or len(moments) < size:
+                break
+            size *= 2
+        if not moments:
+            return []
+        # entries within the minute of the oldest selected moment must be complete as well
+        day, clock = moments[-1]
+        if clock is not None:
+            first = _minute(clock)
+            stop = datetime.combine(dt_date.min, first) + timedelta(minutes=1)
+            end = stop.time() if stop.date() == dt_date.min else None  # None: the minute ends the day
+            cond = [model.date == day, model.time >= first]
+            if end is not None:
+                cond.append(model.time < end)
+            moments += [m for m in db.session.query(model.date, model.time).filter(*base, *cond)
+                        .group_by(model.date, model.time).all() if m not in moments]
+        wanted = or_(*[and_(model.date == d, model.time.is_(None) if t is None else model.time == t)
+                       for d, t in moments])
+        query = model.query.filter(*base, wanted)
+        if model is PlantLog:
+            query = query.options(selectinload(PlantLog.measurements))
+        return query.all()
 
     groups = {}
 
@@ -265,18 +303,21 @@ def _recent(env, limit):
         group['max_id'] = max(group['max_id'], row.id)
 
     for row in newest(PlantActionLog):
-        add(('action', row.date, row.time, row.action, row.notes or None), row, {'action': row.action})
-    for row in newest(PlantLog):
+        add(('action', row.date, _minute(row.time), row.action, row.notes or None), row,
+            {'action': row.action})
+    usable = PlantLog.measurements.any(Measurement.value.isnot(None))
+    for row in newest(PlantLog, usable):
         values = sorted((m.type, m.value) for m in row.measurements if m.value is not None)
         if values:
-            add(('measurement', row.date, row.time, tuple(values), row.notes or None), row,
+            add(('measurement', row.date, _minute(row.time), tuple(values), row.notes or None), row,
                 {'values': dict(values)})
 
     def order(group):
         row = group['row']
+        clock = _minute(row.time)
         # newest first: date desc, untimed after timed of the same day, time desc, id desc
-        return (row.date.toordinal(), row.time is not None,
-                (row.time.hour * 60 + row.time.minute) if row.time else 0, group['max_id'])
+        return (row.date.toordinal(), clock is not None,
+                (clock.hour * 60 + clock.minute) if clock else 0, group['max_id'])
 
     items = []
     for group in sorted(groups.values(), key=order, reverse=True)[:limit]:
@@ -310,7 +351,8 @@ def environments():
     raw_recent = request.args.get('recent')
     recent = 0
     if raw_recent is not None:
-        if not re.fullmatch(r'[0-9]{1,3}', raw_recent) or int(raw_recent) > 50:
+        digits = raw_recent.lstrip('0') or '0'
+        if not re.fullmatch(r'[0-9]+', raw_recent) or len(digits) > 2 or int(digits) > 50:
             raise ApiError(422, 'recent muss eine ganze Zahl von 0 bis 50 sein.')
         recent = int(raw_recent)
     result = []
