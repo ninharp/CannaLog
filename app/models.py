@@ -44,6 +44,8 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
+    api_token_hash = db.Column(db.String(64), index=True)  # SHA-256 hex; the token itself is never stored
+    api_token_last_used = db.Column(db.DateTime)
     plants = db.relationship('Plant', backref='owner', lazy=True)
     environments = db.relationship('Environment', backref='owner', lazy=True)
 

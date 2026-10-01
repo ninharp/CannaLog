@@ -27,6 +27,7 @@
     </nav>
     <div class="topbar__user">
       <span>{{ current_user.username }}</span>
+      <a href="account/api" {% if section == 'api_access' %}aria-current="page"{% endif %}>API</a>
       <a href="logout">Abmelden</a>
     </div>
   </div>

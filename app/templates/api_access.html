@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% from '_ui.html' import icon, form_errors %}
+{% block title %}API-Zugang – CannaLog{% endblock %}
+{% block page_class %}page--narrow{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head__title">
+    <a class="back" href="dashboard">{{ icon('back') }} Übersicht</a>
+    <h1>API-Zugang</h1>
+  </div>
+</div>
+<p>Mit einem Token können Home Assistant oder ein Bedienpanel Einträge anlegen.</p>
+{{ form_errors(form) }}
+{% if token %}
+<section class="card token-card">
+  <h2 class="card__title">Dein neues Token</h2>
+  <code class="token">{{ token }}</code>
+  <p class="card__hint">Jetzt kopieren. Das Token wird nicht noch einmal angezeigt.</p>
+</section>
+{% endif %}
+<section class="card">
+  <h2 class="card__title">Zustand</h2>
+  {% if current_user.api_token_hash %}
+    <p>Token aktiv. Zuletzt benutzt: {% if current_user.api_token_last_used %}{{ current_user.api_token_last_used.strftime('%d.%m.%Y %H:%M') }}{% else %}noch nie{% endif %}</p>
+  {% else %}
+    <p>Kein Token vorhanden.</p>
+  {% endif %}
+  <div class="btn-row">
+    <form method="POST" action="account/api">
+      {{ form.hidden_tag() }}
+      <input type="hidden" name="action" value="create">
+      <button type="submit" class="btn btn--primary">{% if current_user.api_token_hash %}Token erneuern{% else %}Token erzeugen{% endif %}</button>
+    </form>
+    {% if current_user.api_token_hash %}
+    <form method="POST" action="account/api">
+      {{ form.hidden_tag() }}
+      <input type="hidden" name="action" value="revoke">
+      <button type="submit" class="btn btn--danger">Token widerrufen</button>
+    </form>
+    {% endif %}
+  </div>
+</section>
+<section class="card">
+  <h2 class="card__title">Beispielaufruf</h2>
+  <code class="token">curl -H "Authorization: Bearer &lt;token&gt;" {{ request.host_url.rstrip('/') }}{{ request.script_root }}/api/v1/status</code>
+</section>
+{% endblock %}

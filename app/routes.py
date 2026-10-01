@@ -1005,3 +1005,26 @@ def add_image_global():
 @app.route('/healthz')
 def healthz():
     return 'ok'
+
+
+@app.route('/account/api', methods=['GET', 'POST'])
+@login_required
+def api_access():
+    from app.api import hash_token, new_token
+    form = BaseForm()
+    token = None
+    if form.validate_on_submit():
+        action = request.form.get('action')
+        if action == 'create':
+            token = new_token()
+            current_user.api_token_hash = hash_token(token)
+            current_user.api_token_last_used = None
+            db.session.commit()
+            flash('Neues Token erzeugt. Es wird nur jetzt angezeigt.', 'success')
+        elif action == 'revoke':
+            current_user.api_token_hash = None
+            current_user.api_token_last_used = None
+            db.session.commit()
+            flash('Token widerrufen.', 'success')
+            return go('account/api')
+    return render_template('api_access.html', form=form, token=token, section='api_access')
