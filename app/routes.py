@@ -1027,4 +1027,6 @@ def api_access():
             db.session.commit()
             flash('Token widerrufen.', 'success')
             return go('account/api')
-    return render_template('api_access.html', form=form, token=token, section='api_access')
+    response = make_response(render_template('api_access.html', form=form, token=token, section='api_access'))
+    response.headers['Cache-Control'] = 'no-store'
+    return response

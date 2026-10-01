@@ -72,6 +72,12 @@ from datetime import date  # noqa: E402
 from app.models import Environment, EnvironmentLog, Plant, PlantActionLog, PlantLog  # noqa: E402
 
 
+def test_token_page_is_never_cached(web):
+    created = web.post('/account/api', data={'action': 'create'})
+    assert 'no-store' in created.headers.get('Cache-Control', '')
+    assert 'no-store' in web.get('/account/api').headers.get('Cache-Control', '')
+
+
 @pytest.fixture(scope='module')
 def api(web):
     web.post('/environment/add', data={'name': 'Zelt 1', 'exposure_time': '18', 'length': '80',
