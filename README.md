@@ -79,6 +79,117 @@ Tests:
 .venv/bin/python -m pytest
 ```
 
+## API
+
+CannaLog hat eine kleine JSON-API, mit der Home Assistant, ein Bedienpanel oder ein Skript
+Aktionen, Messungen und Klimawerte eintragen können. Sie liegt unter `/api/v1` und ist über den
+direkten Port erreichbar (nicht über Home Assistant Ingress).
+
+**Token erzeugen:** Melde dich an, öffne die Seite „API“ und erzeuge ein Token. Es wird nur einmal
+angezeigt, speichere es also gleich. Ein neues Token ersetzt das alte, auf der Seite lässt es sich auch widerrufen. Das Token gehört zu deinem
+Konto, die API sieht und ändert nur deine eigenen Pflanzen und Umgebungen. Es wird bei jeder Anfrage
+im Header mitgeschickt:
+
+```
+Authorization: Bearer cl_...
+```
+
+Alle Beispiele gehen von `http://localhost:5000` und einem Token in `$TOKEN` aus:
+
+```bash
+export TOKEN=cl_...
+```
+
+Bei `POST` sendest du JSON mit `Content-Type: application/json`. Diese Felder gelten für alle drei
+Eintragsarten:
+
+| Feld | Bedeutung |
+| --- | --- |
+| `date` | Datum als `JJJJ-MM-TT`, ohne Angabe heute |
+| `time` | Uhrzeit als `HH:MM`, optional |
+| `notes` | Notiz als Text, optional |
+
+Die Uhrzeit ist bei allen Einträgen optional. Sie steht in Listen und im Bericht hinter dem Datum.
+
+### Status
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" http://localhost:5000/api/v1/status
+```
+
+Antwort: `{"version": "1.3.0", "user": "michael"}`. Praktisch, um das Token zu prüfen.
+
+### Umgebungen und Pflanzen
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" http://localhost:5000/api/v1/environments
+```
+
+Liefert eine Liste deiner Umgebungen mit Pflanzen und den jeweils neuesten pH- und EC-Werten
+(`null`, solange es keinen gibt). Hier findest du die IDs für die folgenden Aufrufe:
+
+```json
+[{"id": 1, "name": "Zelt 1",
+  "plants": [{"id": 3, "name": "Gelato", "phase": "Wachstum"}],
+  "latest": {"ph": {"value": 6.0, "date": "2026-10-01", "time": "08:30"},
+             "ec": null}}]
+```
+
+### Aktion eintragen
+
+```bash
+curl -X POST http://localhost:5000/api/v1/actions \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"plant_id": 3, "action": "wasser", "time": "08:30", "notes": "0,5 l"}'
+```
+
+`action` ist einer von `wasser`, `naehrstoffe`, `abwehrmittel`, `umtopfen`, `beschneiden`,
+`training`, `anbauflaeche`, `spuelen`, `ernte`, `tot`, `sonstiges`.
+
+### Messung an Pflanzen eintragen
+
+```bash
+curl -X POST http://localhost:5000/api/v1/measurements \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"environment_id": 1, "values": {"ph": 6.1, "ec": 1.4}}'
+```
+
+`values` ordnet jedem Messwert eine Zahl zu. Erlaubt sind `hoehe`, `tds`, `ph`, `ec`,
+`wassertemperatur` und `ppfd`.
+
+### Klimawerte einer Umgebung eintragen
+
+```bash
+curl -X POST http://localhost:5000/api/v1/environment-logs \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"environment_id": 1, "time": "14:00",
+       "values": {"luftfeuchtigkeit": 62, "umgebungstemperatur": {"value": 24, "min": 22, "max": 26}}}'
+```
+
+Jeder Wert ist eine Zahl oder ein Objekt mit `value`, `min` und `max` (alle optional, mindestens eins).
+Erlaubt sind `luftfeuchtigkeit`, `umgebungstemperatur`, `aussentemperatur`, `lichtabstand`, `co2`,
+`niederschlaege`, `durchschnittliche_ppfd` und `vpd`. Die ID der Umgebung steht immer in
+`environment_id`.
+
+### Pflanze oder Umgebung
+
+Bei Aktionen und Messungen gibst du genau eines von `plant_id` und `environment_id` an. Mit
+`environment_id` wird der Eintrag bei jeder Pflanze der Umgebung angelegt. IDs dürfen Zahlen oder
+Ziffern in Anführungszeichen sein.
+
+### Antworten und Fehler
+
+Erfolgreiche `POST`-Aufrufe antworten mit `201`: `{"created": 2, "plants": ["Gelato", "Zkittlez"]}`
+bei Aktionen und Messungen, `{"created": 1}` bei Klimawerten. Fehler kommen als
+`{"error": "…"}` mit diesen Codes:
+
+| Code | Bedeutung |
+| --- | --- |
+| `401` | Token fehlt oder ist ungültig |
+| `404` | Pflanze oder Umgebung gibt es nicht (oder sie gehört einem anderen Konto), auch unbekannte Adressen |
+| `405` | Falsche Methode, z. B. `GET` auf einen `POST`-Endpunkt |
+| `422` | Eingabe ungültig: Datum, Uhrzeit, unbekannte Aktion oder Messwert, keine Zahl, beides oder keins von `plant_id`/`environment_id`, Umgebung ohne Pflanzen |
+
 ## Releases
 
 Ein Tag `vX.Y.Z` baut per GitHub Actions `ghcr.io/ninharp/cannalog` (Standalone) und
