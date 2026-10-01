@@ -135,6 +135,30 @@ Liefert eine Liste deiner Umgebungen mit Pflanzen und den jeweils neuesten pH- u
              "ec": null}}]
 ```
 
+Mit dem optionalen Parameter `recent` (ganze Zahl 0 bis 50, Vorgabe 0) trägt jede Umgebung
+zusätzlich `recent`: die letzten Einträge der eigenen Pflanzen dieser Umgebung, neueste zuerst,
+höchstens `recent` Stück. Ohne den Parameter bleibt die Antwort unverändert; ein ungültiger Wert
+ergibt 422.
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:5000/api/v1/environments?recent=10"
+```
+
+```json
+"recent": [
+  {"type": "action", "date": "2026-10-01", "time": "18:09", "action": "wasser",
+   "label": "Wasser geben", "plants": ["Gelato"], "all": true, "notes": "automatisch"},
+  {"type": "measurement", "date": "2026-10-01", "time": null,
+   "values": {"ph": 6.5, "ec": 1.5}, "plants": ["Gelato"], "all": true, "notes": null}
+]
+```
+
+Quellen sind Aktionen und Pflanzenmessungen. Gleiche Einträge mehrerer Pflanzen (gleiche Art,
+Datum, Uhrzeit, Aktion bzw. Messwerte und Notiz) erscheinen als ein Element; `all` ist wahr, wenn
+es alle Pflanzen der Umgebung umfasst. Die Reihenfolge ist wie überall: Datum absteigend, Einträge
+ohne Uhrzeit nach denen mit Uhrzeit desselben Tages, dann Uhrzeit absteigend. `time` und `notes`
+sind `null`, wenn nicht vorhanden.
+
 ### Aktion eintragen
 
 ```bash

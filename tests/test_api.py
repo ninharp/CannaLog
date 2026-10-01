@@ -592,3 +592,101 @@ def test_environment_log_malformed_id_keeps_integer_message(api):
     r = api['call']('POST', '/environment-logs', {'environment_id': 'abc', 'values': {'vpd': 1}})
     assert r.status_code == 422
     assert r.get_json()['error'] == 'plant_id und environment_id müssen ganze Zahlen sein.'
+
+
+@pytest.fixture(autouse=True)
+def _no_entries_for_recent_tests(request):
+    """The api fixture is module-scoped; the recent tests count entries and need none left over."""
+    if request.node.name.startswith('test_recent') and 'api' in request.fixturenames:
+        with flask_app.app_context():
+            PlantActionLog.query.delete()
+            PlantLog.query.delete()
+            db.session.commit()
+    yield
+
+
+def _recent(api, n=10, env_key='env'):
+    envs = api['call']('GET', f'/environments?recent={n}').get_json()
+    return next(e for e in envs if e['id'] == api[env_key])['recent']
+
+
+def test_environments_without_recent_is_unchanged(api):
+    envs = api['call']('GET', '/environments').get_json()
+    assert all('recent' not in e for e in envs)
+    envs0 = api['call']('GET', '/environments?recent=0').get_json()
+    assert all('recent' not in e for e in envs0)
+
+
+def test_recent_groups_entries_for_all_plants(api):
+    api['call']('POST', '/actions', {'environment_id': api['env'], 'action': 'wasser',
+                                     'date': '2026-10-01', 'time': '18:09', 'notes': 'automatisch'})
+    items = _recent(api)
+    assert items == [{'type': 'action', 'date': '2026-10-01', 'time': '18:09', 'action': 'wasser',
+                      'label': 'Wasser geben', 'plants': ['Amnesia', 'Kush'], 'all': True,
+                      'notes': 'automatisch'}]
+
+
+def test_recent_single_plant_and_measurement(api):
+    api['call']('POST', '/actions', {'plant_id': api['plants']['Kush'], 'action': 'training',
+                                     'date': '2026-10-01', 'time': '09:00'})
+    api['call']('POST', '/measurements', {'environment_id': api['env'], 'date': '2026-10-01',
+                                          'time': '10:00', 'values': {'ph': 6.5, 'ec': 1.5}})
+    items = _recent(api)
+    assert [i['type'] for i in items] == ['measurement', 'action']
+    assert items[0]['values'] == {'ph': 6.5, 'ec': 1.5}
+    assert items[0]['all'] is True and items[0]['notes'] is None
+    assert items[1]['plants'] == ['Kush'] and items[1]['all'] is False
+    assert items[1]['label'] == 'Training'
+
+
+def test_recent_order_and_limit(api):
+    for day, clock in (('2026-09-30', '08:00'), ('2026-10-01', None), ('2026-10-01', '07:00'),
+                       ('2026-10-01', '12:00')):
+        body = {'environment_id': api['env'], 'action': 'wasser', 'date': day}
+        if clock:
+            body['time'] = clock
+        api['call']('POST', '/actions', body)
+    items = _recent(api)
+    assert [(i['date'], i['time']) for i in items] == [
+        ('2026-10-01', '12:00'), ('2026-10-01', '07:00'), ('2026-10-01', None), ('2026-09-30', '08:00')]
+    assert len(_recent(api, 2)) == 2
+
+
+def test_recent_different_notes_are_not_grouped(api):
+    for name, note in (('Amnesia', 'a'), ('Kush', 'b')):
+        api['call']('POST', '/actions', {'plant_id': api['plants'][name], 'action': 'wasser',
+                                         'date': '2026-10-01', 'time': '08:00', 'notes': note})
+    assert len(_recent(api)) == 2
+
+
+def test_recent_empty_environment(api):
+    assert _recent(api, env_key='empty') == []
+
+
+@pytest.mark.parametrize('bad', ['-1', '51', 'abc', '1.5', ''])
+def test_recent_rejects_invalid_values(api, bad):
+    r = api['call']('GET', f'/environments?recent={bad}')
+    assert r.status_code == 422
+    assert 'error' in r.get_json()
+
+
+def test_recent_never_contains_foreign_plants(api, foreign):
+    with flask_app.app_context():
+        stray = Plant(pflanzenname='Streuner', user_id=User.query.filter_by(username='fremd').one().id,
+                      environment_id=api['env'])
+        db.session.add(stray)
+        db.session.commit()
+        stray_id = stray.id
+        db.session.add(PlantActionLog(plant_id=stray_id, action='wasser', date=date(2026, 10, 1)))
+        db.session.commit()
+    try:
+        api['call']('POST', '/actions', {'environment_id': api['env'], 'action': 'wasser',
+                                         'date': '2026-10-01', 'time': '08:00'})
+        items = _recent(api)
+        assert len(items) == 1
+        assert set(items[0]['plants']) == {'Amnesia', 'Kush'} and items[0]['all'] is True
+    finally:
+        with flask_app.app_context():
+            PlantActionLog.query.filter_by(plant_id=stray_id).delete()
+            db.session.delete(db.session.get(Plant, stray_id))
+            db.session.commit()

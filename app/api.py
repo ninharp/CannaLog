@@ -236,6 +236,66 @@ def _latest(env, kind):
     return {'value': value, 'date': day.isoformat(), 'time': clock.strftime('%H:%M') if clock else None}
 
 
+def _recent(env, limit):
+    """Newest journal entries (actions and measurements) of the user's plants in an environment.
+
+    Entries of several plants that are identical in kind, date, time, content and notes
+    are merged into one item.
+    """
+    from app.forms import PLANT_ACTIONS
+    from app.models import PlantActionLog, PlantLog
+    plants = _own_plants(env)
+    if not plants:
+        return []
+    names = {p.id: p.pflanzenname for p in plants}
+    labels = dict(PLANT_ACTIONS)
+    # each source can contribute at most `limit` groups, and a group spans at most len(plants) rows
+    rows_max = limit * len(plants) + limit
+
+    def newest(model):
+        return (model.query.filter(model.plant_id.in_(list(names)))
+                .order_by(model.date.desc(), model.time.is_(None), model.time.desc(), model.id.desc())
+                .limit(rows_max).all())
+
+    groups = {}
+
+    def add(key, row, extra):
+        group = groups.setdefault(key, {'row': row, 'plant_ids': set(), 'max_id': 0, **extra})
+        group['plant_ids'].add(row.plant_id)
+        group['max_id'] = max(group['max_id'], row.id)
+
+    for row in newest(PlantActionLog):
+        add(('action', row.date, row.time, row.action, row.notes or None), row, {'action': row.action})
+    for row in newest(PlantLog):
+        values = sorted((m.type, m.value) for m in row.measurements if m.value is not None)
+        if values:
+            add(('measurement', row.date, row.time, tuple(values), row.notes or None), row,
+                {'values': dict(values)})
+
+    def order(group):
+        row = group['row']
+        # newest first: date desc, untimed after timed of the same day, time desc, id desc
+        return (row.date.toordinal(), row.time is not None,
+                (row.time.hour * 60 + row.time.minute) if row.time else 0, group['max_id'])
+
+    items = []
+    for group in sorted(groups.values(), key=order, reverse=True)[:limit]:
+        row = group['row']
+        item = {'type': 'measurement' if 'values' in group else 'action',
+                'date': row.date.isoformat(),
+                'time': row.time.strftime('%H:%M') if row.time else None}
+        if 'values' in group:
+            item['values'] = group['values']
+        else:
+            item['action'] = group['action']
+            item['label'] = labels.get(group['action'], group['action'])
+        item['plants'] = sorted(names[i] for i in group['plant_ids'])
+        item['all'] = group['plant_ids'] == set(names)
+        item['notes'] = row.notes or None
+        items.append(item)
+    return items
+
+
 @api.route('/status')
 @token_required
 def status():
@@ -247,6 +307,12 @@ def status():
 @token_required
 def environments():
     from app.models import Environment
+    raw_recent = request.args.get('recent')
+    recent = 0
+    if raw_recent is not None:
+        if not re.fullmatch(r'[0-9]{1,3}', raw_recent) or int(raw_recent) > 50:
+            raise ApiError(422, 'recent muss eine ganze Zahl von 0 bis 50 sein.')
+        recent = int(raw_recent)
     result = []
     for env in Environment.query.filter_by(user_id=g.api_user.id).order_by(Environment.id):
         plants = _own_plants(env)
@@ -256,6 +322,8 @@ def environments():
             'plants': [{'id': p.id, 'name': p.pflanzenname, 'phase': p.phase} for p in plants],
             'latest': {kind: _latest(env, kind) for kind in ('ph', 'ec')},
         })
+        if recent > 0:
+            result[-1]['recent'] = _recent(env, recent)
     return jsonify(result)
 
 
