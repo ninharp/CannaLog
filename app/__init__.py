@@ -167,3 +167,6 @@ def zeitpunkt_filter(entry):
 
 
 from app import routes, models  # noqa: E402,F401  (registers routes)
+from app.api import api as api_blueprint  # noqa: E402
+
+app.register_blueprint(api_blueprint)
