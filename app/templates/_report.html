@@ -18,7 +18,7 @@
     <thead><tr><th style="width:7rem">Datum</th><th>Werte</th><th>Notizen</th></tr></thead>
     <tbody>
     {% for log in report.env_logs %}
-      <tr><td>{{ log.date|datum }}</td><td><ul class="readings">{% for m in log.measurements %}{{ reading(m, MEASUREMENT_LABELS) }}{% endfor %}</ul></td><td>{{ log.notes or '' }}</td></tr>
+      <tr><td>{{ log|zeitpunkt }}</td><td><ul class="readings">{% for m in log.measurements %}{{ reading(m, MEASUREMENT_LABELS) }}{% endfor %}</ul></td><td>{{ log.notes or '' }}</td></tr>
     {% endfor %}
     </tbody>
   </table></div>
@@ -42,7 +42,7 @@
     <tbody>
     {% for entry in section.entries %}
       <tr>
-        <td>{{ entry.date|datum }}</td>
+        <td>{{ entry.obj|zeitpunkt }}</td>
         <td>{% if entry.type == 'action' %}{{ ACTION_LABELS.get(entry.obj.action, entry.obj.action) }}{% else %}<ul class="readings">{% for m in entry.obj.measurements %}{{ reading(m, MEASUREMENT_LABELS) }}{% endfor %}</ul>{% endif %}</td>
         <td>{{ entry.obj.notes or '' }}</td>
       </tr>

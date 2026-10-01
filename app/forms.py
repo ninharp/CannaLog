@@ -2,7 +2,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed
 from wtforms.i18n import get_translations as _wtforms_translations
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, DateField, IntegerField, SelectField, FloatField, FieldList, FormField, MultipleFileField, SelectMultipleField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, DateField, TimeField, IntegerField, SelectField, FloatField, FieldList, FormField, MultipleFileField, SelectMultipleField
 from wtforms.validators import DataRequired, Length, EqualTo, Optional
 from datetime import date as dt_date
 
@@ -43,6 +43,7 @@ PLANT_ACTIONS = [
 class PlantActionLogForm(BaseForm):
     plant_id = SelectField('Pflanze', coerce=int, validators=[DataRequired()])
     date = DateField('Datum', format='%Y-%m-%d', default=dt_date.today, validators=[DataRequired()])
+    time = TimeField('Uhrzeit', format='%H:%M', validators=[Optional()])
     action = SelectField('Aktion', choices=PLANT_ACTIONS, validators=[DataRequired()])
     notes = TextAreaField('Notizen', validators=[Optional()])
     submit = SubmitField('Speichern')
@@ -113,12 +114,14 @@ class EnvironmentMeasurementForm(BaseForm):
 
 class PlantLogForm(BaseForm):
     date = DateField('Datum', format='%Y-%m-%d', default=dt_date.today, validators=[DataRequired()])
+    time = TimeField('Uhrzeit', format='%H:%M', validators=[Optional()])
     notes = TextAreaField('Notizen', validators=[Optional()])
     measurements = FieldList(FormField(MeasurementForm), label='Messwert', min_entries=1, max_entries=6)
     submit = SubmitField('Speichern')
 
 class EnvironmentLogForm(BaseForm):
     date = DateField('Datum', format='%Y-%m-%d', default=dt_date.today, validators=[DataRequired()])
+    time = TimeField('Uhrzeit', format='%H:%M', validators=[Optional()])
     notes = TextAreaField('Notizen', validators=[Optional()])
     measurements = FieldList(FormField(EnvironmentMeasurementForm), label='Messwert', min_entries=1, max_entries=6)
     submit = SubmitField('Speichern')

@@ -86,7 +86,7 @@
   <ol class="timeline">
     {% for log in entries %}
     <li class="entry">
-      <div class="entry__date">{{ log.date|datum }}</div>
+      <div class="entry__date">{{ log|zeitpunkt }}</div>
       <div class="entry__kind">{{ icon('sun') }}</div>
       <div class="entry__body">
         {% if log.measurements %}<ul class="readings">{% for m in log.measurements %}{{ reading(m, MEASUREMENT_LABELS) }}{% endfor %}</ul>{% else %}<div class="entry__title">Notiz</div>{% endif %}

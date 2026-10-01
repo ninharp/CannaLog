@@ -16,8 +16,9 @@
   <section class="card form">
     {% if global_mode %}
     <div class="grid-2">{{ field(form.plant_id) }}{{ field(form.date) }}</div>
+    {{ field(form.time) }}
     {% else %}
-    {{ field(form.date) }}
+    <div class="grid-2">{{ field(form.date) }}{{ field(form.time) }}</div>
     {% endif %}
     <div class="field">
       <span class="label">Messwerte</span>

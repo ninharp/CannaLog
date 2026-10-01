@@ -157,4 +157,13 @@ def datum_filter(value):
     return value.strftime('%d.%m.%Y') if value else ''
 
 
+@app.template_filter('zeitpunkt')
+def zeitpunkt_filter(entry):
+    """Date of a log entry, followed by its time of day when one is set."""
+    text = datum_filter(entry.date)
+    if getattr(entry, 'time', None):
+        text += entry.time.strftime(' %H:%M')
+    return text
+
+
 from app import routes, models  # noqa: E402,F401  (registers routes)

@@ -134,6 +134,54 @@ def test_report_and_pdf(client, data):
     assert response.status_code == 200 and response.data[:4] == b'%PDF'
 
 
+def test_action_time_is_saved_and_shown(client, data):
+    response = client.post('/plant_actions/add', data={
+        'plant_id': data['plant_id'], 'date': '2026-09-29', 'time': '08:15', 'action': 'wasser'})
+    assert response.status_code == 302
+    with flask_app.app_context():
+        log = PlantActionLog.query.order_by(PlantActionLog.id.desc()).first()
+        assert log.time.strftime('%H:%M') == '08:15'
+    html = client.get('/plant_actions').get_data(as_text=True)
+    assert '29.09.2026 08:15' in html
+
+
+def test_time_is_optional(client, data):
+    response = client.post('/plant_actions/add', data={
+        'plant_id': data['plant_id'], 'date': '2026-09-27', 'action': 'training'})
+    assert response.status_code == 302
+    with flask_app.app_context():
+        log = PlantActionLog.query.order_by(PlantActionLog.id.desc()).first()
+        assert log.time is None
+
+
+def test_measurement_time_is_saved(client, data):
+    response = client.post(f"/plant/{data['plant_id']}/logs/add", data={
+        'date': '2026-09-29', 'time': '18:30', 'measurements-0-type': 'ec', 'measurements-0-value': '1.4'})
+    assert response.status_code == 302
+    with flask_app.app_context():
+        log = PlantLog.query.order_by(PlantLog.id.desc()).first()
+        assert log.time.strftime('%H:%M') == '18:30'
+    html = client.get(f"/plant/{data['plant_id']}").get_data(as_text=True)
+    assert '29.09.2026 18:30' in html
+
+
+def test_environment_log_time_is_saved(client, data):
+    from app.models import EnvironmentLog
+    response = client.post(f"/environment/{data['env_id']}/logs/add", data={
+        'date': '2026-09-29', 'time': '23:55', 'measurements-0-type': 'vpd', 'measurements-0-value': '1.1'})
+    assert response.status_code == 302
+    with flask_app.app_context():
+        log = EnvironmentLog.query.order_by(EnvironmentLog.id.desc()).first()
+        assert log.time.strftime('%H:%M') == '23:55'
+
+
+def test_invalid_time_is_rejected(client, data):
+    response = client.post('/plant_actions/add', data={
+        'plant_id': data['plant_id'], 'date': '2026-09-29', 'time': '25:99', 'action': 'wasser'})
+    assert response.status_code == 200
+    assert 'Uhrzeit' in ' '.join(errors_of(response)) or 'Uhrzeit' in response.get_data(as_text=True)
+
+
 def test_deleting_a_plant_removes_its_entries(client, data):
     with flask_app.app_context():
         plant = Plant.query.get(data['plant_id'])

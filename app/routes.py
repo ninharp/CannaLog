@@ -83,14 +83,14 @@ def export_logs():
         for plant in selected:
             entries = []
             if form.include_plant_logs.data:
-                entries += [{'type': 'log', 'obj': log, 'date': log.date} for log in plant.logs]
+                entries += [{'type': 'log', 'obj': log, 'date': log.date, 'time': log.time} for log in plant.logs]
             if form.include_action_logs.data:
-                entries += [{'type': 'action', 'obj': action, 'date': action.date} for action in plant.actions]
-            entries.sort(key=lambda entry: entry['date'], reverse=True)
+                entries += [{'type': 'action', 'obj': action, 'date': action.date, 'time': action.time} for action in plant.actions]
+            entries.sort(key=lambda entry: (entry['date'], entry['time'] or datetime.min.time()), reverse=True)
             plant_sections.append({'plant': plant, 'entries': entries})
         report = {
             'env': env,
-            'env_logs': sorted(env.logs, key=lambda log: log.date, reverse=True) if form.include_env_logs.data else [],
+            'env_logs': sorted(env.logs, key=lambda log: (log.date, log.time or datetime.min.time()), reverse=True) if form.include_env_logs.data else [],
             'plants': plant_sections,
             'generated_at': datetime.now().strftime('%d.%m.%Y, %H:%M'),
         }
@@ -123,7 +123,7 @@ def unauthorized():
 def plant_action_logs():
     # Zeige alle Aktionen für Pflanzen des Users
     plants = Plant.query.filter_by(user_id=current_user.id).all()
-    logs = PlantActionLog.query.join(Plant).filter(Plant.user_id == current_user.id).order_by(PlantActionLog.date.desc()).all()
+    logs = PlantActionLog.query.join(Plant).filter(Plant.user_id == current_user.id).order_by(PlantActionLog.date.desc(), PlantActionLog.time.desc()).all()
     return render_template('plant_action_logs.html', logs=logs, plants=plants)
 
 @app.route('/plant_actions/add', methods=['GET', 'POST'])
@@ -140,6 +140,7 @@ def add_plant_action_log():
         log = PlantActionLog(
             plant_id=form.plant_id.data,
             date=form.date.data,
+            time=form.time.data,
             action=form.action.data,
             notes=form.notes.data
         )
@@ -164,6 +165,7 @@ def edit_plant_action_log(log_id):
     if form.validate_on_submit():
         log.plant_id = form.plant_id.data
         log.date = form.date.data
+        log.time = form.time.data
         log.action = form.action.data
         log.notes = form.notes.data
         db.session.commit()
@@ -209,7 +211,7 @@ def add_environment_log(env_id):
             for _ in range(form.measurements.min_entries):
                 form.measurements.append_entry()
     if form.validate_on_submit():
-        log = EnvironmentLog(environment_id=env.id, date=form.date.data, notes=form.notes.data)
+        log = EnvironmentLog(environment_id=env.id, date=form.date.data, time=form.time.data, notes=form.notes.data)
         db.session.add(log)
         db.session.commit()  # log.id muss existieren
         def has_value(val):
@@ -268,6 +270,7 @@ def edit_environment_log(log_id):
             form.measurements.append_entry()
     if form.validate_on_submit():
         log.date = form.date.data
+        log.time = form.time.data
         log.notes = form.notes.data
         # Alte Messungen löschen
         for m in log.measurements:
@@ -350,7 +353,7 @@ def add_plant_log(plant_id):
             for _ in range(form.measurements.min_entries):
                 form.measurements.append_entry()
     if form.validate_on_submit():
-        log = PlantLog(plant_id=plant.id, date=form.date.data, notes=form.notes.data)
+        log = PlantLog(plant_id=plant.id, date=form.date.data, time=form.time.data, notes=form.notes.data)
         db.session.add(log)
         db.session.commit()  # log.id muss existieren
         def has_value(val):
@@ -409,6 +412,7 @@ def edit_plant_log(log_id):
             form.measurements.append_entry()
     if form.validate_on_submit():
         log.date = form.date.data
+        log.time = form.time.data
         log.notes = form.notes.data
         # Alte Messungen löschen
         for m in log.measurements:
@@ -657,11 +661,11 @@ def plant_overview(plant_id):
     logs = PlantLog.query.filter_by(plant_id=plant.id).all()
     actions = PlantActionLog.query.filter_by(plant_id=plant.id).all()
     combined = [
-        {"type": "log", "obj": log, "date": log.date} for log in logs
+        {"type": "log", "obj": log, "date": log.date, "time": log.time} for log in logs
     ] + [
-        {"type": "action", "obj": action, "date": action.date} for action in actions
+        {"type": "action", "obj": action, "date": action.date, "time": action.time} for action in actions
     ]
-    combined.sort(key=lambda x: x["date"], reverse=True)
+    combined.sort(key=lambda x: (x["date"], x["time"] or datetime.min.time()), reverse=True)
     return render_template('plant_overview.html', plant=plant, entries=combined)
     # return render_template('plant_form.html', form=form, plant=plant)
 
@@ -878,7 +882,7 @@ def environment_overview(env_id):
         return go('dashboard')
     plants = Plant.query.filter_by(environment_id=env.id, user_id=current_user.id).all()
     logs = EnvironmentLog.query.filter_by(environment_id=env.id).all()
-    logs_sorted = sorted(logs, key=lambda x: x.date, reverse=True)
+    logs_sorted = sorted(logs, key=lambda x: (x.date, x.time or datetime.min.time()), reverse=True)
     return render_template('environment_overview.html', env=env, plants=plants, entries=logs_sorted)
 
 
@@ -899,7 +903,7 @@ def add_plant_log_global():
     else:
         form.plant_id.data = request.args.get('plant_id', type=int)
     if form.validate_on_submit():
-        log = PlantLog(plant_id=form.plant_id.data, date=form.date.data, notes=form.notes.data)
+        log = PlantLog(plant_id=form.plant_id.data, date=form.date.data, time=form.time.data, notes=form.notes.data)
         db.session.add(log)
         db.session.commit()
         def has_value(val):
@@ -937,7 +941,7 @@ def add_environment_log_global():
     else:
         form.env_id.data = request.args.get('env_id', type=int)
     if form.validate_on_submit():
-        log = EnvironmentLog(environment_id=form.env_id.data, date=form.date.data, notes=form.notes.data)
+        log = EnvironmentLog(environment_id=form.env_id.data, date=form.date.data, time=form.time.data, notes=form.notes.data)
         db.session.add(log)
         db.session.commit()
         def has_value(val):

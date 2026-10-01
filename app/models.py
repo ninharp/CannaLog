@@ -6,6 +6,7 @@ class PlantActionLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     plant_id = db.Column(db.Integer, db.ForeignKey('plant.id'), nullable=False)
     date = db.Column(db.Date, nullable=False)
+    time = db.Column(db.Time)  # optional time of day
     notes = db.Column(db.Text)
     action = db.Column(db.String(50), nullable=False)
     plant = db.relationship('Plant', back_populates='actions')
@@ -13,6 +14,7 @@ class PlantLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     plant_id = db.Column(db.Integer, db.ForeignKey('plant.id'), nullable=False)
     date = db.Column(db.Date, nullable=False)
+    time = db.Column(db.Time)  # optional time of day
     notes = db.Column(db.Text)
     measurements = db.relationship('Measurement', backref='plant_log', lazy=True, cascade='all, delete-orphan')
 
@@ -20,6 +22,7 @@ class EnvironmentLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     environment_id = db.Column(db.Integer, db.ForeignKey('environment.id'), nullable=False)
     date = db.Column(db.Date, nullable=False)
+    time = db.Column(db.Time)  # optional time of day
     notes = db.Column(db.Text)
     measurements = db.relationship('Measurement', backref='environment_log', lazy=True, cascade='all, delete-orphan')
 
@@ -88,7 +91,7 @@ class Plant(db.Model):
 def _latest_measurements(logs):
     """Newest value per measurement type across the given logs, as {type: (measurement, date)}."""
     latest = {}
-    for log in sorted(logs, key=lambda entry: entry.date, reverse=True):
+    for log in sorted(logs, key=lambda entry: (entry.date, entry.time or datetime.min.time()), reverse=True):
         for m in log.measurements:
             latest.setdefault(m.type, (m, log.date))
     return latest
@@ -101,7 +104,7 @@ def _age_days(self):
 
 
 def _last_action(self):
-    return max(self.actions, key=lambda action: action.date, default=None)
+    return max(self.actions, key=lambda action: (action.date, action.time or datetime.min.time()), default=None)
 
 
 Plant.age_days = property(_age_days)

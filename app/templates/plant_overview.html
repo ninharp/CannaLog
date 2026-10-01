@@ -33,7 +33,7 @@
       <div class="stat"><dt>Medium</dt><dd>{{ MEDIA_LABELS.get(plant.medium_type, plant.medium_type or '–') }}</dd></div>
       <div class="stat"><dt>Umgebung</dt><dd>{{ plant.environment.name if plant.environment else 'Draußen' }}</dd></div>
       {% set last = plant.last_action %}
-      <div class="stat"><dt>Letzte Aktion</dt><dd>{% if last %}{{ ACTION_LABELS.get(last.action, last.action) }}<small>{{ last.date|datum }}</small>{% else %}–{% endif %}</dd></div>
+      <div class="stat"><dt>Letzte Aktion</dt><dd>{% if last %}{{ ACTION_LABELS.get(last.action, last.action) }}<small>{{ last|zeitpunkt }}</small>{% else %}–{% endif %}</dd></div>
     </dl>
     {% set latest = plant.latest_measurements %}
     {% if latest %}
@@ -61,7 +61,7 @@
   <ol class="timeline">
     {% for entry in entries %}
     <li class="entry">
-      <div class="entry__date">{{ entry.date|datum }}</div>
+      <div class="entry__date">{{ entry.obj|zeitpunkt }}</div>
       {% if entry.type == 'action' %}
         <div class="entry__kind entry__kind--action">{{ icon('drop') }}</div>
         <div class="entry__body">

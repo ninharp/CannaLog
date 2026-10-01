@@ -13,7 +13,7 @@
 <ol class="timeline">
   {% for log in logs %}
   <li class="entry">
-    <div class="entry__date">{{ log.date|datum }}</div>
+    <div class="entry__date">{{ log|zeitpunkt }}</div>
     <div class="entry__kind entry__kind--action">{{ icon('drop') }}</div>
     <div class="entry__body">
       <div class="entry__title">{{ ACTION_LABELS.get(log.action, log.action) }} <span style="font-weight:400;color:var(--muted)">bei</span> <a href="plant/{{ log.plant.id }}">{{ log.plant.pflanzenname }}</a></div>
