@@ -117,7 +117,7 @@ Die Uhrzeit ist bei allen Einträgen optional. Sie steht in Listen und im Berich
 curl -H "Authorization: Bearer $TOKEN" http://localhost:5000/api/v1/status
 ```
 
-Antwort: `{"version": "1.3.0", "user": "michael"}`. Praktisch, um das Token zu prüfen.
+Antwort: `{"version": "1.4.0", "user": "michael"}`. Praktisch, um das Token zu prüfen.
 
 ### Umgebungen und Pflanzen
 
